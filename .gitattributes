@@ -1,0 +1,14 @@
+# 统一换行策略：仓库内一律 LF，检出时按需要转换
+* text=auto eol=lf
+
+# Windows 批处理必须用 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不做任何转换
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.xlsm binary
+*.pdf binary
+*.ico binary

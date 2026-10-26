@@ -1,0 +1,24 @@
+# 领域知识与别名
+#
+# pin_aliases: 管脚名归一化时的等价写法（键为归一化后的标准名）
+#   GPIO_PC13 / PC13 / GPIOC13 / gpio pc 13  →  PC13
+# gpio_number_scope: per_chip=每个芯片独立编号 / global=全局编号
+# config_key_aliases: 配置项宏名的等价/包含关系
+# value_aliases: 期望值/当前值的等价写法
+
+pin_aliases:
+  PC13: ["GPIOC13", "GPIOC_13", "PC_13", "PORT_C_13", "C13"]
+
+gpio_number_scope: per_chip     # per_chip | global
+
+config_key_aliases:
+  CONFIG_LED1_GPIO: ["LED1_GPIO", "LED1_PIN", "GPIO_LED1"]
+  CONFIG_KEY1_GPIO: ["KEY1_GPIO", "KEY1_PIN", "GPIO_KEY1"]
+
+# 数值/符号归一化时视为等价的写法
+value_aliases:
+  "1": ["true", "yes", "y", "on", "enable", "enabled"]
+  "0": ["false", "no", "n", "off", "disable", "disabled"]
+
+# 参与核对的字段（未勾选的列不参与差异判定，仅作展示）
+compare_fields: ["expected_value"]

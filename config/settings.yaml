@@ -1,0 +1,36 @@
+# GenBoardConfig 默认配置
+# 本地覆盖请写 settings.local.yaml（自动 gitignore），优先级更高
+
+llm:
+  # provider: openai_compatible | anthropic | mock
+  # mock 为本地启发式核对器，无需网络与密钥，用于离线演示/回归
+  provider: mock
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  api_key: ""            # 建议改用凭据存储（设置页"保存到系统凭据"）
+  timeout_seconds: 60
+  max_retries: 3
+  temperature: 0.0
+  max_batch_size: 20
+  use_structured_output: true     # 请求端 json_schema 约束输出
+
+check:
+  confidence_threshold: 0.80      # 低于此值降级为 ambiguous
+  use_llm: true
+  use_deterministic_first: true
+  max_context_entries: 40         # 单次送入模型的 .c 条目上限
+
+validate:
+  run_structural: true
+  run_semantic_recheck: true
+  use_gcc: false
+  gcc_path: "gcc"
+
+privacy:
+  mask_sensitive: true
+  show_payload_preview: true      # 发送前展示将要上传的内容
+
+output:
+  workdir: ""                     # 空=使用 .c 文件所在目录下的 .genboard
+  backup_subdir: "backup"
+  log_subdir: "logs"

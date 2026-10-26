@@ -1,0 +1,28 @@
+[project]
+name = "genboardconfig"
+version = "0.1.0"
+description = "按 GPIO 分配 Excel 核对并修正板级 .c 配置文件的 Windows 桌面工具"
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6",
+    "openpyxl>=3.1",
+    "pydantic>=2.5",
+    "httpx>=0.26",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-mock>=3.12"]
+
+[project.scripts]
+genboardconfig = "genboardconfig.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
