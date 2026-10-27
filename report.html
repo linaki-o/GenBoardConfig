@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>GPIO 配置核对报告</title><style>
+:root{--bd:#e2e8f0;--muted:#64748b;--bg:#f8fafc}
+*{box-sizing:border-box}
+body{font-family:"Microsoft YaHei","Segoe UI",sans-serif;margin:0;padding:24px;background:var(--bg);color:#0f172a}
+h1{font-size:20px;margin:0 0 4px}
+.meta{color:var(--muted);font-size:12px;margin-bottom:16px}
+.cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:10px 16px;min-width:110px}
+.card .n{font-size:22px;font-weight:700}
+.card .t{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+th,td{padding:7px 10px;border-bottom:1px solid var(--bd);font-size:12px;text-align:left;vertical-align:top}
+th{background:#f1f5f9;font-weight:600;position:sticky;top:0}
+tr:hover td{background:#f8fafc}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;white-space:nowrap}
+code{font-family:Consolas,monospace;background:#f1f5f9;padding:1px 4px;border-radius:4px;font-size:11px}
+.snippet{font-family:Consolas,monospace;font-size:11px;color:#334155;white-space:pre-wrap}
+</style></head><body>
+<h1>GPIO 配置核对报告</h1>
+<div class="meta">
+ 生成时间：2026-10-27 09:14:32<br>
+ Excel：D:/lk__tool/GenBoardConfig/samples/05_Hardware_Software_Interface(HSI)-AOC CU34B3E  715GF603-M0A-B02-0050  20260621.xlsx<br>
+ C 配置：D:/lk__tool/GenBoardConfig/samples/BoardCfg.h<br>
+ 核对档案：hsi<br>
+ 大模型调用：0 次 / 0 tokens
+</div>
+<div class="cards"><div class="card"><div class="n" style="color:#16a34a">7</div><div class="t">一致</div></div><div class="card"><div class="n" style="color:#dc2626">7</div><div class="t">不一致</div></div><div class="card"><div class="n" style="color:#ea580c">0</div><div class="t">缺失</div></div><div class="card"><div class="n" style="color:#ca8a04">0</div><div class="t">歧义</div></div><div class="card"><div class="n" style="color:#64748b">0</div><div class="t">不适用</div></div><div class="card"><div class="n" style="color:#7c3aed">0</div><div class="t">未解析</div></div><div class="card"><div class="n">14</div><div class="t">总条目</div></div><div class="card"><div class="n">1368</div><div class="t">C 解析条目</div></div></div>
+
+<table>
+<thead><tr><th>网络名</th><th>引脚</th><th>宏组</th><th>状态</th><th>逐属性核对</th><th>置信度</th><th>说明</th></tr></thead>
+<tbody><tr><td>+3V3C_EN</td><td>PA2</td><td><code>PA2</code></td><td><span class="badge" style="color:#dc2626;background:#fee2e2">不一致</span></td><td><div><span style='color:#dc2626'>方向</span>: IN → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#16a34a'>上电电平</span>: High → HIGH</div></td><td>0.95</td><td>引脚 PA2（A 端口第 2 位）；占用信号：PW_MOS1_OFF、PW_MOS3_ON；方向：期望 IN，实际 OUT</td></tr><tr><td>DP_HPD</td><td>PB6/DPRX1_HPD</td><td><code>PB6</code></td><td><span class="badge" style="color:#16a34a;background:#dcfce7">一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Push pull → HIGH</div><div><span style='color:#16a34a'>上电电平</span>: Low → LOW</div></td><td>0.95</td><td>引脚 PB6（B 端口第 6 位）；占用信号：DIG1_HPD；核对项全部一致</td></tr><tr><td>ON_BACKLIGHT</td><td>PC1</td><td><code>PC1</code></td><td><span class="badge" style="color:#dc2626;background:#fee2e2">不一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#dc2626'>输出类型</span>: Open-Drain Output → HIGH</div><div><span style='color:#dc2626'>上电电平</span>: High → LOW</div></td><td>0.95</td><td>引脚 PC1（C 端口第 1 位）；占用信号：BACKLIGHT；输出类型：期望 Open-Drain Output，实际 HIGH；上电电平：期望 High，实际 LOW</td></tr><tr><td>Panel_On</td><td>PC2</td><td><code>PC2</code></td><td><span class="badge" style="color:#dc2626;background:#fee2e2">不一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Push pull → HIGH</div><div><span style='color:#dc2626'>上电电平</span>: High → LOW</div></td><td>0.95</td><td>引脚 PC2（C 端口第 2 位）；占用信号：PANEL_POWER、USBCG1_DET；上电电平：期望 High，实际 LOW</td></tr><tr><td>+1VC_EN</td><td>PD1</td><td><code>PD1</code></td><td><span class="badge" style="color:#16a34a;background:#dcfce7">一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#16a34a'>上电电平</span>: High → HIGH</div></td><td>0.95</td><td>引脚 PD1（D 端口第 1 位）；占用信号：PW_MOS1_ON、PW_MOS3_OFF；核对项全部一致</td></tr><tr><td>EE_SCL</td><td>PD2</td><td><code>PD2</code></td><td><span class="badge" style="color:#16a34a;background:#dcfce7">一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#16a34a'>上电电平</span>: High → HIGH</div></td><td>0.95</td><td>引脚 PD2（D 端口第 2 位）；占用信号：EEPORM1_SCL；核对项全部一致</td></tr><tr><td>EE_SDA</td><td>PD3</td><td><code>PD3</code></td><td><span class="badge" style="color:#16a34a;background:#dcfce7">一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#16a34a'>上电电平</span>: High → HIGH</div></td><td>0.95</td><td>引脚 PD3（D 端口第 3 位）；占用信号：EEPORM1_SDA；核对项全部一致</td></tr><tr><td>EE_WP</td><td>PE1</td><td><code>PE1</code></td><td><span class="badge" style="color:#16a34a;background:#dcfce7">一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#16a34a'>上电电平</span>: High → HIGH</div></td><td>0.95</td><td>引脚 PE1（E 端口第 1 位）；占用信号：EDP_TEST、EEPORM1_WP；核对项全部一致</td></tr><tr><td>LED_Y_C</td><td>PE2</td><td><code>PE2</code></td><td><span class="badge" style="color:#dc2626;background:#fee2e2">不一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#dc2626'>上电电平</span>: Low → HIGH</div></td><td>0.95</td><td>引脚 PE2（E 端口第 2 位）；占用信号：BREATHING_LED_RED_PWM_GPIO、BREATHING_LED_RED_PWM_OUT、LED_RED；上电电平：期望 Low，实际 HIGH</td></tr><tr><td>LED_W_C</td><td>PE3</td><td><code>PE3</code></td><td><span class="badge" style="color:#dc2626;background:#fee2e2">不一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#dc2626'>上电电平</span>: Low → HIGH</div></td><td>0.95</td><td>引脚 PE3（E 端口第 3 位）；占用信号：BREATHING_LED_GREEN_PWM_GPIO、BREATHING_LED_GREEN_PWM_OUT、LED_GREEN；上电电平：期望 Low，实际 HIGH</td></tr><tr><td>HDMI1_HPD</td><td>PE5</td><td><code>PE5</code></td><td><span class="badge" style="color:#16a34a;background:#dcfce7">一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#16a34a'>上电电平</span>: High → HIGH</div></td><td>0.95</td><td>引脚 PE5（E 端口第 5 位）；占用信号：DIG0_HPD；核对项全部一致</td></tr><tr><td>DDR_1.5V_EN</td><td>PF0</td><td><code>PF0</code></td><td><span class="badge" style="color:#16a34a;background:#dcfce7">一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Open Drain → LOW</div><div><span style='color:#16a34a'>上电电平</span>: High → HIGH</div></td><td>0.95</td><td>引脚 PF0（F 端口第 0 位）；占用信号：PW_MOS2_OFF、PW_MOS2_ON；核对项全部一致</td></tr><tr><td>BL_ADIM</td><td>PK1/PWMB</td><td><code>PK1</code></td><td><span class="badge" style="color:#dc2626;background:#fee2e2">不一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Push pull → HIGH</div><div><span style='color:#dc2626'>上电电平</span>: HIGH → LOW</div></td><td>0.95</td><td>引脚 PK1（K 端口第 1 位）；占用信号：BKL_ADIM；上电电平：期望 HIGH，实际 LOW</td></tr><tr><td>BL_PDIM</td><td>PK2/PSM2</td><td><code>PK2</code></td><td><span class="badge" style="color:#dc2626;background:#fee2e2">不一致</span></td><td><div><span style='color:#16a34a'>方向</span>: OUT → OUT</div><div><span style='color:#16a34a'>输出类型</span>: Push pull → HIGH</div><div><span style='color:#dc2626'>上电电平</span>: HIGH → LOW</div></td><td>0.95</td><td>引脚 PK2（K 端口第 2 位）；占用信号：BFREE_PSM2、BKL_PDIM；上电电平：期望 HIGH，实际 LOW</td></tr></tbody></table>
+<h2 style='font-size:16px;margin-top:22px'>修改 Diff</h2><pre class='snippet' style='background:#fff;border:1px solid var(--bd);border-radius:10px;padding:12px;overflow:auto'>--- a/BoardCfg.h
++++ b/BoardCfg.h
+@@ -23,15 +23,15 @@
+ //Mcu I/O port default output         bit:   7     6     5     4     3     2     1     0
+ #define PORT_A_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH,  LOW)
+ #define PORT_B_DEFAULT_OUT     BitsToByte(HIGH,  LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+-#define PORT_C_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH,  LOW,  LOW, HIGH)
++#define PORT_C_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH,  HIGH,  HIGH, HIGH)
+ #define PORT_D_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+-#define PORT_E_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
++#define PORT_E_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, LOW, LOW, HIGH, HIGH)
+ #define PORT_F_DEFAULT_OUT     BitsToByte( LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+ #define PORT_G_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+ #define PORT_H_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+ #define PORT_I_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+ #define PORT_J_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+-#define PORT_K_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH,  LOW, HIGH, LOW, LOW, HIGH)
++#define PORT_K_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH,  LOW, HIGH, HIGH, HIGH, HIGH)
+ #define PORT_L_DEFAULT_OUT     BitsToByte(HIGH,  LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+ #define PORT_M_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+ #define PORT_N_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH)
+@@ -64,7 +64,7 @@
+ //Mcu I/O port Push-Pull Configuration bit: 7     6     5     4     3     2     1     0
+ #define PORT_A_DEFAULT_PP     BitsToByte( LOW,  LOW,  LOW,  LOW, HIGH,  LOW,  LOW,  LOW)
+ #define PORT_B_DEFAULT_PP     BitsToByte( LOW, HIGH,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW)
+-#define PORT_C_DEFAULT_PP     BitsToByte( LOW,  LOW,  LOW,  LOW,  LOW, HIGH, HIGH,  LOW)
++#define PORT_C_DEFAULT_PP     BitsToByte( LOW,  LOW,  LOW,  LOW,  LOW, HIGH, OPEN-DRAIN OUTPUT,  LOW)
+ #define PORT_D_DEFAULT_PP     BitsToByte( LOW,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW)
+ #define PORT_E_DEFAULT_PP     BitsToByte( LOW, HIGH,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW)
+ #define PORT_F_DEFAULT_PP     BitsToByte(HIGH,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW)</pre>
+</body></html>

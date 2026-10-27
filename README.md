@@ -205,6 +205,9 @@ python tools/smoke.py            :: 通用模式端到端
 python tools/gui_smoke.py        :: 离屏 GUI 冒烟
 python tools/screenshot.py       :: 生成界面截图
 python tools/sample_gen.py       :: 生成通用模式样例数据
+python tools/inspect_rtk_excel.py   :: RTK 样例 Excel 结构探查
+python tools/inspect_rtk_cross.py   :: RTK Excel × .h 交叉对照探查
+python tools/inspect_rtk_rules2.py  :: RTK 规则分层量化
 ```
 
 ---
@@ -215,7 +218,8 @@ python tools/sample_gen.py       :: 生成通用模式样例数据
 |---|---|
 | [docs/requirements.md](docs/requirements.md) | 需求分析：目标、范围、功能/非功能需求、异常场景 |
 | [docs/architecture.md](docs/architecture.md) | 架构设计：分层图、流程图、LLM 集成、ADR |
-| [docs/comparison_rules.md](docs/comparison_rules.md) | **比对规则**：真实数据结构、逐属性规则、修改落点、实测结论 |
+| [docs/comparison_rules.md](docs/comparison_rules.md) | **NTK 核对规则**：端口位表口径、逐属性映射、实测结论 |
+| [docs/comparison_rules_rtk.md](docs/comparison_rules_rtk.md) | **RTK 核对规则（初稿待评审）**：PINSHARE 三层判定、量化结果、8 个待确认项 |
 
 ---
 
