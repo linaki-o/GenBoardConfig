@@ -16,9 +16,9 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 from genboardconfig.app.context import Session  # noqa: E402
 from genboardconfig.app.service_factory import (  # noqa: E402
     build_check_usecase,
-    detect_profile,
-    load_profiles,
+    profile_for_series,
 )
+from genboardconfig.domain.models import CheckStatus  # noqa: E402
 from genboardconfig.infra.settings import load_settings  # noqa: E402
 from genboardconfig.ui.compare_view import CompareView  # noqa: E402
 
@@ -52,7 +52,7 @@ def _make_result(tmp_path: Path):
     cfile.write_text(C_FILE, encoding="utf-8")
 
     settings = load_settings()
-    profile = detect_profile(str(excel), load_profiles(settings))
+    profile = profile_for_series(settings, "ntk")
     usecase = build_check_usecase(settings, profile)
     session = Session(excel_path=str(excel), c_path=str(cfile))
     return usecase.run(session, progress=lambda m, p: None, use_llm=False)
@@ -114,3 +114,71 @@ def test_selection_links_both_sides(tmp_path: Path):
     app.processEvents()
     selected = [i.row() for i in view.right.selectionModel().selectedRows()]
     assert sorted(selected) == [0, 1, 2]      # 该行的 3 个条目
+
+
+# ----------------------------------------------------------------------
+# 回归：同一 .h 条目被多个属性引用时，右表「判定」必须取最严重的一条
+# （RTK 的一行有 方向/类别、输出类型、功能名 三个属性指向同一条 #define，
+#   其中「功能名」是标注型（一致），不能覆盖前面的「不一致」）
+# ----------------------------------------------------------------------
+RTK_SAMPLE = """//---------------------------------------------------------------------------
+// Function : LEDG
+//---------------------------------------------------------------------------
+#define _PIN_H4                  (_PIN_H4_GPI)
+
+typedef enum
+{
+    _PIN_H4_GPI = 0x00,
+    _PIN_H4_GPO_PP = 0x01,
+    _PIN_H4_GPO_OD = 0x02,
+    _PIN_H4_PWM_IN = 0x03,
+    _PIN_H4_NC = _PIN_H4_GPO_PP,
+} EnumPinshareInfoPINH4;
+"""
+
+
+def test_rtk_right_pane_keeps_worst_verdict(tmp_path: Path):
+    from openpyxl import Workbook
+
+    from genboardconfig.app.service_factory import (
+        build_check_usecase,
+        profile_for_series,
+    )
+    from genboardconfig.domain.profiles import Profile
+
+    profile = Profile.load(
+        Path(__file__).resolve().parents[1] / "config" / "profiles" / "rtk.yaml"
+    )
+    excel = tmp_path / "hsi.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "HSI"
+    ws.append(
+        [
+            "PIN #", "Chip Section", "PIN Name ", "Description/ Function", "AI",
+            "Schematic Function", "GPIO  TYPE(输入输出类别)", "Output PIN 设定类型",
+            "Power On", "Power Saving", "Power Off", "F/W Check", "EE Check",
+        ]
+    )
+    ws.append(["G5", "Output", "PWM_IN / PWM_2 / GPIO", "desc", "", "LEDG", "OUT",
+               "Open-Drain Output", "Low", "Low", "High", "PASS", "PASS"])
+    wb.save(excel)
+    cfile = tmp_path / "pinshare.h"
+    cfile.write_text(RTK_SAMPLE, encoding="utf-8")
+
+    settings = load_settings()
+    usecase = build_check_usecase(settings, profile)
+    session = Session(excel_path=str(excel), c_path=str(cfile))
+    result = usecase.run(session, progress=lambda m, p: None, use_llm=False)
+
+    row = result.results[0]
+    assert row.status == CheckStatus.MISMATCH
+    # 三个属性指向同一条 entry
+    assert len({ev.entry_id for a in row.attribute_results for ev in a.evidence}) == 1
+
+    _app()
+    view = CompareView()
+    view.set_result(result)
+    assert view.right_model.rowCount() == 1
+    verdict = view.right_model.data(view.right_model.index(0, 4))
+    assert verdict == "不一致", f"右表判定应为不一致，实际 {verdict}"

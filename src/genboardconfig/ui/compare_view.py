@@ -31,6 +31,16 @@ C_NA_BG = "#f8fafc"
 C_LINK_BG = "#fffbeb"
 C_LINK_FG = "#b45309"
 
+# 结论严重度：同一条目被多个属性引用时取最严重的一条
+VERDICT_SEVERITY = {
+    "一致": 0,
+    "不适用": 1,
+    "未解析": 2,
+    "需人工确认": 3,
+    "缺失": 4,
+    "不一致": 5,
+}
+
 
 class _HighlightModel(QAbstractTableModel):
     """带单元格/行着色的表格模型基类。"""
@@ -336,6 +346,7 @@ class CompareView(QWidget):
         related_by_req: dict[int, list[str]] = {}
         req_index = {r.id: i for i, r in enumerate(result.requirements)}
         entry_extra: dict[str, dict] = {}
+        entry_severity: dict[str, int] = {}
         for res in result.results:
             idx = req_index.get(res.requirement_id, -1)
             ids: list[str] = []
@@ -344,6 +355,15 @@ class CompareView(QWidget):
                 change = attr.change
                 if change is not None and change.target:
                     targets.append(change.target)
+                verdict = {
+                    "match": "一致",
+                    "mismatch": "不一致",
+                    "ambiguous": "需人工确认",
+                    "missing": "缺失",
+                    "unresolved": "未解析",
+                    "not_applicable": "不适用",
+                }.get(attr.status.value, attr.status.value)
+                severity = VERDICT_SEVERITY.get(verdict, 0)
                 for eid in targets:
                     if eid not in self._index_of:
                         continue
@@ -352,17 +372,14 @@ class CompareView(QWidget):
                         ordered_ids.append(eid)
                     if eid not in ids:
                         ids.append(eid)
-                    verdict = {
-                        "match": "一致",
-                        "mismatch": "不一致",
-                        "ambiguous": "需人工确认",
-                        "missing": "缺失",
-                        "unresolved": "未解析",
-                    }.get(attr.status.value, attr.status.value)
-                    entry_extra[eid] = {
-                        "expected": attr.expected or "-",
-                        "verdict": verdict,
-                    }
+                    # 同一条目可能被多个属性引用（如方向/输出类型/功能名指向同一条
+                    # #define）→ 取最严重的结论，避免被后写的属性覆盖
+                    if severity >= entry_severity.get(eid, -1):
+                        entry_severity[eid] = severity
+                        entry_extra[eid] = {
+                            "expected": attr.expected or "-",
+                            "verdict": verdict,
+                        }
             related_by_req[idx] = ids
         self._related_by_req = related_by_req
         self._ordered_ids = ordered_ids
