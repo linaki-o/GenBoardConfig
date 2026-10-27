@@ -1,0 +1,94 @@
+# RTK 系列档案：Realtek RL6829 引脚复用表（PINSHARE）核对
+#
+# 与 NTK 的根本差异：
+#   NTK 核「端口位表 PORT_X_DEFAULT_OUT/DIR/PP」；RTK 核「引脚复用功能 _PIN_<PAD>(...)」
+# 详见 docs/comparison_rules_rtk.md
+id: rtk
+name: RTK 系列（Realtek 引脚复用表核对）
+enabled: true
+
+excel:
+  sheet: HSI
+  header_keywords: ["schematic function", "gpio  type", "output pin"]
+
+  # 行过滤：G 列「GPIO TYPE(输入输出类别)」非空的所有取值都参与核对
+  row_filter:
+    field: gpio_type
+    values: [IN, OUT, SCL, SDA, ADC, PWM, "I/O", IO, ANALOG]
+    # 主列无匹配 → 不核对（不做回退）
+    skip_when_empty: true
+
+  columns:
+    pin_name: ["pin name"]
+    net_name: ["schematic function"]
+    gpio_type: ["gpio type"]
+    io_type: ["output pin"]
+    power_on: ["power on"]
+    power_saving: ["power saving"]
+    power_off: ["power off"]
+    description: ["description"]
+    bom_ref: ["pin #"]
+    remark: ["remark", "check result remark"]
+
+  # 参与核对的属性
+  attributes:
+    - {name: elec_type, label: 方向/类别, from: gpio_type, check: rtk_electrical}
+    - {name: io_type,   label: 输出类型,   from: io_type,   check: rtk_electrical}
+
+  # 说明：I/J/K 三列（Power On/Saving/Off）按评审结论「默认正确，当前不核对」
+  value_map:
+    gpio_type:
+      IN: IN
+      OUT: OUT
+      SCL: SCL
+      SDA: SDA
+      ADC: ADC
+      PWM: OUT
+      "I/O": "I/O"
+      IO: "I/O"
+    io_type:
+      OPEN-DRAIN OUTPUT: GPO_OD
+      PUSH-PULL OUTPUT: GPO_PP
+      OPEN DRAIN: GPO_OD
+      PUSH-PULL: GPO_PP
+      PUSH PULL: GPO_PP
+
+c_config:
+  kind: pinshare
+
+  # 通用 GPIO 类型（.h 选中项属于这三者时，才与 Excel 的电气期望直接比对）
+  generic_gpio: [GPI, GPO_PP, GPO_OD]
+
+  # Excel G 列 → 期望的通用 GPIO 类型（.h 选中通用 GPIO 时使用）
+  expected_gpio:
+    IN: GPI
+    OUT: GPO_PP          # 具体 PP/OD 由 H 列细化
+    SCL: GPO_OD          # I2C 必须开漏
+    SDA: GPO_OD
+
+  # Excel H 列（输出类型）→ 期望的通用 GPIO 类型（覆盖 expected_gpio）
+  expected_io:
+    OPEN-DRAIN OUTPUT: GPO_OD
+    PUSH-PULL OUTPUT: GPO_PP
+
+  # 专用功能 → 电气类别（用于「Excel G 列 ↔ .h 专用功能」比对）
+  function_category:
+    SCL: [SCL, IICSCL, DDCSCL, EEIICSCL, AUDIO_SCL, TXD_SCL, RXD_SCL]
+    SDA: [SDA, IICSDA, DDCSDA, EEIICSDA, AUDIO_SDA, TXD_SDA, RXD_SDA]
+    ADC: [ADC, ABIAS]
+    OUT: [PWM, GPO, DCLK, HPD, DET, LATCH, CTRL, SEL, EN, RESET, TEST4B]
+    IN: [GPI]
+
+  # Excel 网络名噪声：命中即跳过该行（模板占位符 / 专用功能域）
+  skip_net_patterns:
+    - "FUNCTION$"
+    - "\\(SPI\\)"
+    - "KEY ADC"
+    - "Headphone"
+
+  # .h 中无该网络名区块时 → 不核对（评审结论：23 行缺失不进行核对）
+  missing_action: skip
+
+  # 专用功能名与 Excel (App) 功能名不一致时 → 交大模型判定等效关系
+  llm_function_equivalence: true
+  llm_confidence_threshold: 0.7

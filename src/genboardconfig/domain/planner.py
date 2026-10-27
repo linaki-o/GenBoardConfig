@@ -16,8 +16,34 @@ KIND_TO_CHANGE = {
     "struct_field": ChangeType.SET_STRUCT_FIELD,
     "array_item": ChangeType.SET_ARRAY_ITEM,
     "call_arg": ChangeType.NONE,
+    "rtk_block": ChangeType.SET_MACRO,
     "unknown": ChangeType.NONE,
 }
+
+
+def aggregate_attribute_changes(result: MatchResult) -> None:
+    """把属性级变更汇总为行级修改建议（档案模式共用）。"""
+    changes = [
+        attr.change
+        for attr in result.attribute_results
+        if attr.change is not None and attr.change.type != ChangeType.NONE
+    ]
+    blocked = [
+        attr.change
+        for attr in result.attribute_results
+        if attr.change is not None
+        and attr.change.type == ChangeType.NONE
+        and attr.change.reason
+    ]
+    if changes:
+        result.proposed_change = changes[0]
+        result.selected = True
+    elif blocked:
+        result.proposed_change = blocked[0]
+        result.selected = False
+        result.notes += "；" + blocked[0].reason
+    else:
+        result.proposed_change.type = ChangeType.NONE
 
 
 class Planner:
@@ -26,7 +52,6 @@ class Planner:
     def plan(
         self, result: MatchResult, entries_by_id: dict[str, ConfigEntry]
     ) -> ProposedChange:
-        change = result.proposed_change
         if result.status == CheckStatus.MISSING:
             change.type = ChangeType.INSERT_BLOCK
             change.target = ""

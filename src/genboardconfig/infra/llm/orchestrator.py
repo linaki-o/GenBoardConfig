@@ -22,9 +22,11 @@ from .provider.base import LLMProvider, LLMRequest
 from .schema import (
     CHECK_JSON_SCHEMA,
     COLUMN_JSON_SCHEMA,
+    FUNCTION_JSON_SCHEMA,
     SYMBOL_JSON_SCHEMA,
     LlmCheckResponse,
     LlmColumnResponse,
+    LlmFunctionResponse,
     LlmSymbolResponse,
 )
 
@@ -108,6 +110,43 @@ class LLMOrchestrator:
             if progress:
                 progress(f"大模型核对 {done}/{total}", done / total)
         return results
+
+    def review_functions(
+        self,
+        items: list[dict[str, Any]],
+        progress: ProgressFn | None = None,
+    ) -> dict[str, tuple[bool, float, str]]:
+        """功能名等效关系复核（RTK 专用功能名 vs Excel (App) 功能名）。
+
+        items: [{requirement_id, net_name, excel_function, header_function,
+                 pad, excel_gpio_type, options:[...]}]
+        返回 {requirement_id: (equivalent, confidence, reason)}
+        """
+        out: dict[str, tuple[bool, float, str]] = {}
+        if not items:
+            return out
+        payload = {"items": items}
+        response = self.provider.complete(
+            LLMRequest(
+                system=self._system_prompt("review_functions"),
+                user=self.masker.mask(json.dumps(payload, ensure_ascii=False, indent=2)),
+                json_schema=FUNCTION_JSON_SCHEMA,
+                temperature=0.0,
+                max_tokens=2048,
+            )
+        )
+        self._absorb(response)
+        if response.error or not isinstance(response.parsed, dict):
+            return out
+        try:
+            parsed = LlmFunctionResponse.model_validate(response.parsed)
+        except Exception:  # noqa: BLE001
+            return out
+        for item in parsed.results:
+            out[item.requirement_id] = (item.equivalent, item.confidence, item.reason)
+        if progress:
+            progress(f"功能名复核完成：{len(out)}/{len(items)}", 1.0)
+        return out
 
     def map_symbols(
         self,

@@ -82,7 +82,7 @@ def main() -> int:
 
     usecase = build_check_usecase(settings, profile)
     session = Session(
-        excel_path=str(excel), c_path=str(ROOT / "samples" / "BoardCfg.h")
+        excel_path=str(excel), c_path=str(ROOT / "samples" / "NTK" / "BoardCfg.h")
     )
     result = usecase.run(session, progress=lambda m, p: None, use_llm=True)
 

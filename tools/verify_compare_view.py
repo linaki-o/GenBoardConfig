@@ -27,8 +27,8 @@ from genboardconfig.ui.style import apply_style  # noqa: E402
 
 def main() -> int:
     settings = load_settings()
-    excel = sorted((ROOT / "samples").glob("*.xlsx"))[0]
-    cfile = ROOT / "samples" / "BoardCfg.h"
+    excel = sorted((ROOT / "samples" / "NTK").glob("*.xlsx"))[0]
+    cfile = ROOT / "samples" / "NTK" / "BoardCfg.h"
 
     profile = detect_profile(str(excel), load_profiles(settings))
     usecase = build_check_usecase(settings, profile)

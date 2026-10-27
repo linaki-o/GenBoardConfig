@@ -19,10 +19,10 @@ from ..domain.models import (
     GPIORequirement,
     Source,
 )
-from ..domain.normalize import norm_key
-from ..domain.planner import Planner
+from ..domain.planner import Planner, aggregate_attribute_changes
 from ..domain.profiles import Profile
 from ..domain.rules import RuleEngine
+from ..domain.rtk import RtkEngine
 from ..infra.cconfig.parser import CConfigParser
 from ..infra.excel.reader import ExcelParser
 from ..infra.llm.orchestrator import LLMOrchestrator
@@ -69,10 +69,13 @@ class CheckUseCase:
         report(f"C 文件解析完成：{len(c_result.entries)} 个配置项", 0.42)
 
         session.c_parse = c_result
+        session.parser = self.c_parser
         session.warnings.extend(excel_result.warnings)
         session.warnings.extend(c_result.warnings)
 
-        if self.profile is not None and self._is_profile_mode():
+        if self.profile is not None and self._kind() == "rtk":
+            results, engine = self._run_rtk(excel_result, c_result, report, use_llm)
+        elif self.profile is not None and self._kind() == "hsi":
             results, engine = self._run_profile(excel_result, c_result, report, use_llm)
             entries_by_id = {e.id: e for e in c_result.entries}
             candidates_by_req = {}
@@ -110,11 +113,105 @@ class CheckUseCase:
         return check_result
 
     # ------------------------------------------------------------------
+    def _kind(self) -> str:
+        """核对模式：rtk（引脚复用表）/ hsi（端口位表）/ generic。"""
+        if self.profile is None:
+            return "generic"
+        kind = self.profile.c_cfg("kind")
+        if kind == "pinshare":
+            return "rtk"
+        if any(spec.check != "none" for spec in self.profile.attributes):
+            return "hsi"
+        return "generic"
+
     def _is_profile_mode(self) -> bool:
         if self.profile is None:
             return False
         return any(spec.check != "none" for spec in self.profile.attributes)
 
+    # ------------------------------------------------------------------
+    def _run_rtk(
+        self, excel_result, c_result, report: ProgressFn, use_llm: bool
+    ):
+        """RTK：引脚复用表核对。"""
+        assert self.profile is not None
+        report("按档案核对引脚复用表 ...", 0.5)
+        engine = RtkEngine(self.profile, c_result.entries)
+        results = engine.check(excel_result.requirements)
+        checked = sum(
+            1
+            for r in results
+            if r.status not in {CheckStatus.NOT_APPLICABLE.value}
+        )
+        report(f"核对完成：{checked}/{len(results)} 行纳入核对", 0.7)
+
+        if use_llm and self.orchestrator is not None:
+            self._llm_function_review(results, excel_result.requirements, engine, report)
+
+        report("生成修改建议 ...", 0.95)
+        for res in results:
+            self._plan_rtk(res)
+        return results, engine
+
+    def _llm_function_review(
+        self, results, requirements, engine, report: ProgressFn
+    ) -> None:
+        """功能名等效关系交大模型判定（评审结论 Q6）。"""
+        reqs = {r.id: r for r in requirements}
+        items = []
+        index = {}
+        for res in results:
+            attr = res.attribute("function_name")
+            if attr is None or attr.status != CheckStatus.AMBIGUOUS.value:
+                continue
+            req = reqs.get(res.requirement_id)
+            entry = next(
+                (e for e in engine.entries if e.id == attr.evidence[0].entry_id),
+                None,
+            ) if attr.evidence else None
+            if entry is None or req is None:
+                continue
+            rid = res.requirement_id
+            items.append(
+                {
+                    "requirement_id": rid,
+                    "net_name": req.net_name or req.config_key,
+                    "excel_function": attr.expected,
+                    "header_function": attr.actual,
+                    "pad": entry.group,
+                    "excel_gpio_type": attr.expected,
+                    "options": [m.split("_", 3)[-1] for m in entry.members][:20],
+                }
+            )
+            index[rid] = attr
+        if not items:
+            return
+        report(f"大模型复核 {len(items)} 条功能名等效关系 ...", 0.75)
+        verdicts = self.orchestrator.review_functions(
+            items, progress=lambda msg, p: report(msg, 0.75 + 0.15 * p)
+        )
+        threshold = float(self.profile.c_cfg("llm_confidence_threshold", default=0.7))
+        for rid, attr in index.items():
+            verdict = verdicts.get(rid)
+            if verdict is None:
+                attr.notes += "；模型未给出结论，需人工确认"
+                continue
+            equivalent, confidence, reason = verdict
+            if confidence < threshold:
+                attr.notes += f"；模型置信度 {confidence:.2f} 不足，仍需人工确认"
+                continue
+            attr.status = CheckStatus.MATCH if equivalent else CheckStatus.MISMATCH
+            attr.confidence = confidence
+            attr.source = Source.LLM
+            attr.notes += f"；模型判定：{'等效' if equivalent else '不等效'}（{reason}）"
+        report("大模型复核完成", 0.92)
+
+    @staticmethod
+    def _plan_rtk(res) -> None:
+        """RTK 行级修改建议：取属性级变更。"""
+        aggregate_attribute_changes(res)
+
+    # ------------------------------------------------------------------
     def _run_profile(
         self, excel_result, c_result, report: ProgressFn, use_llm: bool
     ):
@@ -202,27 +299,7 @@ class CheckUseCase:
     @staticmethod
     def _plan_profile(res) -> None:
         """把属性级结论汇总为行级修改建议。"""
-        changes = [
-            attr.change
-            for attr in res.attribute_results
-            if attr.change is not None and attr.change.type.value != "none"
-        ]
-        blocked = [
-            attr.change
-            for attr in res.attribute_results
-            if attr.change is not None
-            and attr.change.type.value == "none"
-            and attr.change.reason
-        ]
-        if changes:
-            res.proposed_change = changes[0]
-            res.selected = True
-        elif blocked:
-            res.proposed_change = blocked[0]
-            res.selected = False
-            res.notes += "；" + blocked[0].reason
-        else:
-            res.proposed_change.type = ChangeType.NONE
+        aggregate_attribute_changes(res)
 
     # ------------------------------------------------------------------
     def _run_generic(

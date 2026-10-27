@@ -101,18 +101,17 @@ class _HighlightModel(QAbstractTableModel):
 
 
 class ExcelCompareModel(_HighlightModel):
-    """左侧：Excel 原始行 + 逐属性核对结论。"""
-
-    HEADERS = ["行", "管脚", "网络名", "方向(G)", "输出类型(H)", "上电电平(I)", "状态", "差异说明"]
-    ATTR_KEYS = [("direction", 3), ("io_type", 4), ("power_on", 5)]
+    """左侧：Excel 原始行 + 逐属性核对结论（属性列按档案自适应）。"""
 
     def __init__(self):
-        super().__init__(list(self.HEADERS))
-        self._req_index: dict[int, int] = {}   # 需求序号 → 行号
+        super().__init__([])
+        self._attr_names: list[str] = []
+        self._attr_labels: list[str] = []
 
     def set_result(self, result: CheckResult) -> None:
         self.beginResetModel()
-        self._reset(list(self.HEADERS))
+        self._reset(self._build_headers(result))
+        self._attr_names, self._attr_labels = self._collect_attrs(result)
 
         reqs = result.requirements
         res_by_id = {r.requirement_id: r for r in result.results}
@@ -120,7 +119,7 @@ class ExcelCompareModel(_HighlightModel):
             res = res_by_id.get(req.id)
             attrs = {a.name: a for a in (res.attribute_results if res else [])}
             cells = [req.row_no, req.pin_name_raw, req.net_name or req.config_key]
-            for name, col in self.ATTR_KEYS:
+            for name, col in zip(self._attr_names, self._attr_cols()):
                 attr = attrs.get(name)
                 if attr is None:
                     cells.append("")
@@ -138,20 +137,39 @@ class ExcelCompareModel(_HighlightModel):
             status = res.status.value if res else "-"
             cells.append(status)
             cells.append(res.notes if res else "")
+            status_col = len(self._headers) - 2
             if res is not None:
                 if res.status == CheckStatus.MISMATCH.value:
-                    self._cell_bg[(i, 6)] = QColor(C_BAD_BG)
-                    self._cell_fg[(i, 6)] = QColor(C_BAD_FG)
-                    self._bold.add((i, 6))
+                    self._cell_bg[(i, status_col)] = QColor(C_BAD_BG)
+                    self._cell_fg[(i, status_col)] = QColor(C_BAD_FG)
+                    self._bold.add((i, status_col))
                 elif res.status == CheckStatus.AMBIGUOUS.value:
-                    self._cell_bg[(i, 6)] = QColor(C_LINK_BG)
-                    self._cell_fg[(i, 6)] = QColor(C_LINK_FG)
-                    self._bold.add((i, 6))
+                    self._cell_bg[(i, status_col)] = QColor(C_LINK_BG)
+                    self._cell_fg[(i, status_col)] = QColor(C_LINK_FG)
+                    self._bold.add((i, status_col))
                 elif res.status == CheckStatus.MATCH.value:
-                    self._cell_bg[(i, 6)] = QColor(C_OK_BG)
-                    self._cell_fg[(i, 6)] = QColor(C_OK_FG)
+                    self._cell_bg[(i, status_col)] = QColor(C_OK_BG)
+                    self._cell_fg[(i, status_col)] = QColor(C_OK_FG)
             self._rows.append(cells)
         self.endResetModel()
+
+    def _collect_attrs(self, result: CheckResult) -> tuple[list[str], list[str]]:
+        names: list[str] = []
+        labels: list[str] = []
+        for res in result.results:
+            for attr in res.attribute_results:
+                if attr.name in names:
+                    continue
+                names.append(attr.name)
+                labels.append(attr.label or attr.name)
+        return names, labels
+
+    def _build_headers(self, result: CheckResult) -> list[str]:
+        names, labels = self._collect_attrs(result)
+        return ["行", "管脚", "网络名"] + labels + ["状态", "差异说明"]
+
+    def _attr_cols(self) -> list[int]:
+        return list(range(3, 3 + len(self._attr_names)))
 
 
 class CCompareModel(_HighlightModel):

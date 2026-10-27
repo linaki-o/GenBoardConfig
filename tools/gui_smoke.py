@@ -24,7 +24,7 @@ def main() -> int:
     import tempfile
 
     tmp = Path(tempfile.mkdtemp(prefix="gbc_gui_"))
-    samples = ROOT / "samples"
+    samples = ROOT / "samples" / "NTK"
     excel_src = sorted(samples.glob("*.xlsx"))
     c_src = sorted(samples.glob("*.h")) + sorted(samples.glob("*.c"))
     if excel_src and c_src:

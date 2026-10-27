@@ -65,6 +65,44 @@ class LlmSymbolResponse(BaseModel):
     mappings: list[LlmSymbolItem] = Field(default_factory=list)
 
 
+class LlmFunctionItem(BaseModel):
+    requirement_id: str
+    equivalent: bool = False
+    confidence: float = 0.0
+    reason: str = ""
+
+
+class LlmFunctionResponse(BaseModel):
+    results: list[LlmFunctionItem] = Field(default_factory=list)
+
+
+FUNCTION_JSON_SCHEMA: dict[str, Any] = {
+    "name": "function_equivalence",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "results": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "requirement_id": {"type": "string"},
+                        "equivalent": {"type": "boolean"},
+                        "confidence": {"type": "number"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["requirement_id", "equivalent", "confidence", "reason"],
+                },
+            }
+        },
+        "required": ["results"],
+    },
+}
+
+
 SYMBOL_JSON_SCHEMA: dict[str, Any] = {
     "name": "symbol_mapping",
     "strict": True,

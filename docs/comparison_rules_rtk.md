@@ -1,8 +1,8 @@
-# RTK 系列核对规则（初稿 · 待确认）
+# RTK 系列核对规则（已确认 · 已实现）
 
 > 依据样例：`samples/RTK/Hardware_Software_Interface_PHL 27M2N5500X_20250611.XLSX`
 > 与 `samples/RTK/TPV_21_715GF225_2H1DP_EDP_PINSHARE.h`
-> 状态：**初稿，等评审确认后再实现**（当前代码只实现了 NTK 规则）
+> 状态：**规则已评审确认并实现**（档案 `config/profiles/rtk.yaml`，引擎 `src/genboardconfig/domain/rtk.py`）
 
 ---
 
@@ -149,28 +149,48 @@ typedef enum
 
 ---
 
-## 5. 待确认问题（决定实现方式）
+## 5. 评审确认结论（8 项已定）
 
-| # | 问题 | 我的建议 |
+| # | 问题 | 确认结论 | 实现落点 |
+|---|---|---|---|
+| Q1 | 行过滤范围 | **含全部**（G 列非空：IN/OUT/SCL/SDA/ADC → 58 行） | `row_filter.values` |
+| Q2 | 通用 GPIO 实现专用功能 | **算一致但标注** | `RtkEngine._check_function_name`（备注「以通用 GPIO 实现」） |
+| Q3 | 23 行「缺失」 | **不进行核对**（标为不适用） | `missing_action: skip` |
+| Q4 | 上电电平 I/J/K 列 | **默认正确，当前不核对** | 档案中不列为核对属性 |
+| Q5 | 候选功能集 vs 枚举成员集 | **不核对** | 枚举成员仅作上下文展示 |
+| Q6 | 功能名等效关系 | **交模型**（置信度阈值 0.7） | `orchestrator.review_functions()` + `config/prompts/review_functions.md` |
+| Q7 | 写回目标 | **改 `#define _PIN_C1 (_PIN_C1_GPO_OD)` 的右值** | `RtkPinshareParser` 记录后缀的精确列区间 |
+| Q8 | 档案选择冲突 | **设置内增加 NTK/RTK 切换** | 设置页「项目系列」；自动模式按 C 侧文件特征识别 |
+
+### 实现后的实测结果（58 行参与）
+
+| 结论 | 数量 | 说明 |
 |---|---|---|
-| Q1 | **行过滤范围**：只核对 G ∈ {IN, OUT}（46 行），还是含 SCL/SDA/ADC（58 行）？ | 含全部非空（58 行）；SCL/SDA 是 I2C 专用功能，可比 |
-| Q2 | **「通用 GPIO 实现专用功能」算不算一致？**（14 行，占比最大） | **算一致**，但备注「以通用 GPIO 实现」；若你认为必须显式声明专用功能，改为「不一致」 |
-| Q3 | **23 行「缺失」如何定性**？ | 三分：① 不在本文件（SPI/ADC/AUDIO/LVDS/复位/按键）→ 标「不在本文件·需人工确认」；② Excel 模板占位符 → 忽略；③ 其它 → 判「配置缺失」 |
-| Q4 | **上电电平（I/J/K 列）** 在本文件无编码（MCU 控制寄存器里设置）→ 是否需要扩展核对到 MCU 初始化表？ | 本期不核对，标「不在核对范围」 |
-| Q5 | 是否核对「Excel C 列候选功能集」与「`.h` 枚举成员集」的一致性（芯片手册 vs 头文件）？ | 本期不做（属另一类检查：芯片手册一致性） |
-| Q6 | 功能名等效关系（如 `AUX1_CHP`↔`DPRX_AUX_P_1`）用**别名表**还是交模型？ | 别名表 + 模型兜底 |
-| Q7 | **写回目标**确认：改 `#define _PIN_C1 (_PIN_C1_GPO_OD)` 的右值？ | 是（列偏移精确，与 NTK 同机制） |
-| Q8 | 两套 Excel 的 HSI **表头几乎相同**，档案不能只按 Sheet 名选 | 档案匹配改为由 **C 侧文件特征**驱动：含 `PORT_X_DEFAULT_*` → NTK；含 `_PIN_<PAD> (...)` 区块 → RTK |
+| 一致 | **25** | 含 14 行「以通用 GPIO 实现专用功能」（已标注） |
+| **不一致** | **6** | 全部可自动改写：DP1_HOT_PLUG、LEDA、LEDG、USB_ON、USB_DET、DDR_PW_EN |
+| 歧义（需人工/模型） | **2** | AUX1_CHP、AUX1_CHN（模型置信度不足，保持歧义） |
+| 不适用（不核对） | **25** | 23 行 `.h` 中无该网络名 + 2 行 Excel 噪声 |
+
+写回与复检：6 项改动只替换 `#define` 右值的后缀（`_PIN_B3_GPI` → `_PIN_B3_GPO_OD`），
+排版与对齐完全保留；复检结果 **修复 12 / 剩余 0 / 新增 0**（12 = 6 行 × 2 个属性）。
+
+### 补充规则（实现时确定）
+
+- **输出类型列只对输出类信号有效**：G 列非 OUT 时，H 列不参与判定（否则 `power` 行 G=IN/H=Open-Drain 会被误判）
+- **I2C 期望开漏**：G 列为 `SCL`/`SDA` 时，期望 `.h` 选中 `GPO_OD`（推挽则判不一致）
+- **专用功能 → 通用 GPIO 的改动不自动应用**：影响硬件行为，仅给人工建议（`type=none` + 原因）
 
 ---
 
-## 6. 实现计划（待 Q1~Q8 确认后）
+## 6. 实现落点（已完成）
 
-1. **解析器** `infra/cconfig/rtk_pinshare.py`：解析 158 个区块 → `RtkPinBlock{function, pad, selected, members, define_line, define_col}`，保留 `#define` 右值的精确列区间（可写回）。
-2. **档案** `config/profiles/rtk.yaml`：Sheet=HSI、列映射（G/H/C/F）、行过滤、值映射、功能类别词表、别名表。
-3. **引擎** `domain/rtk.py`：L0 行筛选 → L1 电气属性 → L2 功能名（歧义交模型）→ L3 存在性 → 生成 `AttributeResult` 与 `ChangePlan`（复用现有模型与写回链路）。
-4. **档案匹配**：`app/service_factory.py` 改为按 C 侧文件特征选择档案；`samples/` 下按 `NTK/`、`RTK/` 分目录不影响选择（样本目录仅用于演示）。
-5. **UI**：并排对比视图复用（右侧表格换成 RTK 条目：功能区块、pad、选中功能、枚举成员）。
-6. **测试**：`tests/test_rtk.py`（解析、区块匹配、L1/L2/L3 判定、写回落点）。
-
-> 现有 NTK 链路与已写回的文件**不受影响**：新档案独立、引擎并列、UI 复用表格渲染。
+| 模块 | 位置 | 说明 |
+|---|---|---|
+| 档案 | `config/profiles/rtk.yaml` | Sheet=HSI、列映射、行过滤、值映射、类型词表、噪声规则 |
+| 解析器 | `infra/cconfig/rtk_pinshare.py` | 解析 158 个引脚复用区块；`#define` 右值（后缀）精确列区间 |
+| 引擎 | `domain/rtk.py` | L0 行筛选 / L1 电气属性 / L2 功能名 / L3 存在性 / L4 噪声 |
+| 模型复核 | `infra/llm/orchestrator.py:review_functions()` + `config/prompts/review_functions.md` | 功能名等效关系 |
+| 系列选择 | `app/service_factory.py:detect_series()` + 设置页「项目系列」 | 自动按 C 侧文件特征识别，或手动指定 |
+| 复检 | `infra/validate/semantic.py`（按档案类型选引擎） | 写回后逐属性复检 |
+| 测试 | `tests/test_rtk.py`（9 项） | 解析、落点、L1/L2/L3/L4 判定、写回 |
+| 端到端 | `tools/smoke_rtk.py` | 真实样例核对 + 副本上写回 |

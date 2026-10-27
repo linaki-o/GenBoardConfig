@@ -31,6 +31,24 @@ class SettingsDialog(QDialog):
 
         root = QVBoxLayout(self)
 
+        proj_box = QGroupBox("项目")
+        pform = QFormLayout(proj_box)
+        self.series_combo = QComboBox()
+        self.series_combo.addItem("自动检测（按板级配置文件特征）", "auto")
+        self.series_combo.addItem("NTK 系列（Novatek 端口位表）", "ntk")
+        self.series_combo.addItem("RTK 系列（Realtek 引脚复用表）", "rtk")
+        sidx = self.series_combo.findData(settings.get("check.series", "auto"))
+        self.series_combo.setCurrentIndex(max(0, sidx))
+        pform.addRow("项目系列", self.series_combo)
+        pnote = QLabel(
+            "NTK：核对 PORT_X_DEFAULT_OUT/DIR/PP 端口位表；"
+            "RTK：核对 #define _PIN_<PAD> (_PIN_<PAD>_<FUNC>) 引脚复用。"
+        )
+        pnote.setWordWrap(True)
+        pnote.setStyleSheet("color:#64748b;font-size:11px;")
+        pform.addRow("", pnote)
+        root.addWidget(proj_box)
+
         if profile is not None:
             root.addWidget(self._build_filter_box(profile))
 
@@ -136,6 +154,7 @@ class SettingsDialog(QDialog):
         s.set("llm.use_structured_output", self.structured.isChecked())
         s.set("check.use_llm", self.use_llm.isChecked())
         s.set("privacy.mask_sensitive", self.mask.isChecked())
+        s.set("check.series", self.series_combo.currentData() or "auto")
         if self.profile is not None:
             values = [
                 v.strip()

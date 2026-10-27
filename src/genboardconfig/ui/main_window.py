@@ -38,8 +38,8 @@ from ..app.report_usecase import ReportUseCase
 from ..app.service_factory import (
     build_apply_usecase,
     build_check_usecase,
-    detect_profile,
-    load_profiles,
+    detect_series,
+    profile_for_series,
 )
 from ..domain.models import (
     STATUS_LABELS,
@@ -418,29 +418,32 @@ class MainWindow(QMainWindow):
             self._update_actions()
 
     def _detect_profile(self) -> None:
-        """按 Excel 结构自动选择档案（比对规则）。"""
-        path = self.excel_edit.text()
-        profiles = load_profiles(self.settings)
-        profile = detect_profile(path, profiles) if path else None
-        if profile is not None:
-            self.profile = profile
-            self.check_usecase = build_check_usecase(self.settings, profile)
-            self.lbl_profile.setText(f"{profile.name}（{profile.id}）")
-            self.lbl_profile.setToolTip(
-                "已启用档案模式：按行核对多个属性，规则见 config/profiles/"
-                f"{profile.id}.yaml"
-            )
-            self._log(f"已识别档案：{profile.name}（{profile.id}）")
-        else:
+        """按项目系列（设置项 / 板级配置特征）选择核对档案。"""
+        series = (self.settings.get("check.series", "auto") or "auto").lower()
+        c_path = self.c_edit.text()
+        if series == "auto":
+            series = detect_series(c_path) if c_path else "ntk"
+        profile = profile_for_series(self.settings, series)
+        if profile is None:
             self.profile = None
             self.check_usecase = build_check_usecase(self.settings)
             self.lbl_profile.setText("通用模式")
             self.lbl_profile.setToolTip("未匹配到档案，按「一行一配置项」通用规则核对")
+            return
+        self.profile = profile
+        self.check_usecase = build_check_usecase(self.settings, profile)
+        self.lbl_profile.setText(f"{profile.name}")
+        self.lbl_profile.setToolTip(
+            f"档案 id：{profile.id}；系列：{series.upper()}\n"
+            f"规则文件：config/profiles/{profile.id}.yaml"
+        )
+        self._log(f"已识别档案：{profile.name}（{series.upper()}）")
 
     def _pick_c(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "选择板级 C 配置文件", "", C_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, "选择板级配置文件", "", C_FILTER)
         if path:
             self.c_edit.setText(path)
+            self._detect_profile()
             self._update_actions()
 
     def _update_actions(self) -> None:

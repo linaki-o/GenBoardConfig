@@ -25,7 +25,7 @@ from genboardconfig.infra.settings import load_settings  # noqa: E402
 
 
 def main() -> int:
-    samples = ROOT / "samples"
+    samples = ROOT / "samples" / "NTK"
     excels = [p for p in samples.glob("*.xlsx")]
     headers = [p for p in samples.glob("*.h")] + [p for p in samples.glob("*.c")]
     if not excels or not headers:

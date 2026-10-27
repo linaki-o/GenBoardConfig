@@ -7,13 +7,14 @@
 
 ---
 
-## 1. 真实场景（已支持）
+## 1. 真实场景（NTK + RTK 双系列已支持）
 
-以真实样例为准：
+界面在「设置 → 项目系列」可切换 **NTK / RTK**（默认按板级配置文件特征自动识别）。
 
-- `samples/05_Hardware_Software_Interface(HSI)-AOC CU34B3E  715GF603-M0A-B02-0050  20260621.xlsx`
-  → 关键 Sheet 是 **HSI**（表头在第 5 行）
-- `samples/BoardCfg.h` → scaler 板级配置，核对目标是**端口位表**：
+### 1.1 NTK 系列（Novatek，端口位表）
+
+- `samples/NTK/05_Hardware_Software_Interface(HSI)-....xlsx` → 关键 Sheet **HSI**（表头第 5 行）
+- `samples/NTK/BoardCfg.h` → 核对目标是**端口位表**：
 
 ```c
 #define PORT_C_DEFAULT_OUT     BitsToByte(HIGH, HIGH, HIGH, HIGH, HIGH,  LOW,  LOW, HIGH)  // 上电电平 bit7..bit0
@@ -22,45 +23,48 @@
 #define PORT_C_DEFAULT_PU      BitsToByte( LOW,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW,  LOW)      // 上拉
 ```
 
-### 核对范围（按评审要求收敛）
+| 板级配置宏 | Excel 列 | 属性 |
+|---|---|---|
+| `PORT_X_DEFAULT_DIR[bit]` | **G 列**「GPIO  TYPE(输入输出类别)」 | 方向 |
+| `PORT_X_DEFAULT_PP[bit]` | **H 列**「Output PIN 设定类型」 | 输出类型 |
+| `PORT_X_DEFAULT_OUT[bit]` | **I 列**「Power On」 | 上电电平 |
+| `PORT_X_DEFAULT_PU[bit]` | — | **暂时忽略** |
 
-| 侧 | 范围 |
-|---|---|
-| **C 侧** | 只核对 `PORT_<X>_DEFAULT_{OUT,DIR,PP,PU}` 位表 |
-| **Excel 侧** | 只核对 **HSI Sheet** 中 **「GPIO  TYPE(输入输出类别)」列为 `IN`/`OUT`** 的行（该列为空时自动回退到 `Chip Section`） |
-| 引脚定位 | Excel 的「PIN Name」列（`PC1` → 端口 C 第 1 位） |
-| 信号宏组 | 仅作上下文（该引脚被哪些信号占用），不参与判定 |
+### 1.2 RTK 系列（Realtek RL6829，引脚复用表）
 
-逐属性映射（评审确认）：
+- `samples/RTK/Hardware_Software_Interface_PHL 27M2N5500X_20250611.XLSX` → 同样是 **HSI** Sheet（127 行）
+- `samples/RTK/TPV_21_715GF225_2H1DP_EDP_PINSHARE.h` → 核对目标是**引脚复用**：
 
-| 板级配置宏 | Excel 列 | 属性 | 归一化 |
-|---|---|---|---|
-| `PORT_X_DEFAULT_DIR[bit]` | **G 列**「GPIO  TYPE(输入输出类别)」 | 方向 | IN↔IN、OUT↔Output/OUT |
-| `PORT_X_DEFAULT_PP[bit]` | **H 列**「Output PIN 设定类型」 | 输出类型 | Push pull↔HIGH、Open Drain↔LOW |
-| `PORT_X_DEFAULT_OUT[bit]` | **I 列**「Power On」 | 上电电平 | High↔HIGH、Low↔LOW |
-| `PORT_X_DEFAULT_PU[bit]` | （Excel 无对应列） | 上拉 | **暂时忽略** |
+```c
+// Function : HDMI2_HPD            ← 原理图网络名（对应 Excel F 列）
+#define _PIN_C1                  (_PIN_C1_GPO_OD)   ← ★ 实际生效的复用功能
+```
 
-不在核对范围：J 列「Power Saving」、K 列「Power Off」。
-补充规则：单元格标注 `NA` / `N/A` / `-` 等占位值时**不参与判定**（原文仍显示）。
+RTK 核的是「引脚被复用成了哪个功能、什么电气属性」，分五层：
+L0 行筛选（G 列非空 → 58 行）→ L1 电气属性（`GPI`/`GPO_PP`/`GPO_OD` 与 G/H 列比对）
+→ L2 功能名（专用功能名与 Excel (App) 名不一致 → **交大模型**判定等效）
+→ L3 存在性（`.h` 无该网络名 → **不核对**）→ L4 噪声（模板占位符/`(SPI)` 等 → 跳过）。
 
-### ⚠ 当前样例的一个事实
+实测（58 行）：**25 一致 / 6 不一致 / 2 歧义（待模型或人工）/ 25 不适用**。
+6 处不一致可自动改写，只替换 `#define` 右值后缀，排版不变；复检「修复 12 / 剩余 0 / 新增 0」。
 
-样例 HSI 表的 **`GPIO  TYPE(输入输出类别)`（G 列）确实全为空**——三重验证一致：
+完整规则见 **[docs/comparison_rules.md](docs/comparison_rules.md)** 与 **[docs/comparison_rules_rtk.md](docs/comparison_rules_rtk.md)**。
+
+### ⚠ 当前 NTK 样例的一个事实
+
+NTK 样例 HSI 表的 **`GPIO  TYPE(输入输出类别)`（G 列）确实全为空**——三重验证一致：
 openpyxl `data_only=True/False` 两种读法、以及 xlsx 的 **raw XML**（`<c r="G6" s="49"/>` 只有样式没有值）；
 全工作簿唯一的 `IN`/`OUT` 文本在 `Sheet1!C4='In'`、`Sheet1!C5='out'`（I/O 类型图例表）。
-该文件时间戳 `2026-10-26 14:34`，未被更新。
 
-因此工具加了**自动回退**：主过滤列无匹配行时改用备用列 `Chip Section`（`Output`/`Input`），
+因此 NTK 档案加了**自动回退**：主过滤列无匹配行时改用备用列 `Chip Section`（`Output`/`Input`），
 并在报告与界面明确标注「回退」及实际使用的列：
 
 ```
 [HSI] 「gpio_type」列无匹配行（该列取值：无），已自动改用备用列「chip_section」参与核对，共 14 行。
 ```
 
-→ 本文件实际核对 **14 行：8 一致 / 6 不一致**（6 条全为上电电平）。
+→ NTK 实际核对 **14 行：8 一致 / 6 不一致**（6 条全为上电电平）。
 → 换成 G 列已填写的版本时，工具会自动用 G 列，**无需任何配置改动**。
-
-完整规则见 **[docs/comparison_rules.md](docs/comparison_rules.md)**。
 
 ---
 
@@ -168,11 +172,12 @@ graph LR
 
 ```
 config/
-  settings.yaml            模型、批量、阈值
+  settings.yaml            模型、批量、阈值、项目系列(auto/ntk/rtk)
   column_mapping.yaml      通用列映射
   aliases.yaml             别名与等价值
-  profiles/hsi.yaml        ★ HSI 档案：表结构 + 属性 + C 侧规则
-  prompts/                 check_gpio.md / map_symbols.md / identify_columns.md
+  profiles/ntk.yaml        ★ NTK 档案：端口位表口径
+  profiles/rtk.yaml        ★ RTK 档案：引脚复用表口径
+  prompts/                 check_gpio.md / map_symbols.md / review_functions.md
 src/genboardconfig/
   domain/
     models.py              实体：Requirement/Entry/AttributeResult/ChangePlan

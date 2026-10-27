@@ -70,6 +70,17 @@ def recheck(
     return report
 
 
+def _make_engine(profile: Profile, entries):
+    """按档案类型构造核对引擎。"""
+    if profile.c_cfg("kind") == "pinshare":
+        from ...domain.rtk import RtkEngine
+
+        return RtkEngine(profile, entries)
+    from ...domain.hsi import HsiEngine
+
+    return HsiEngine(profile, entries)
+
+
 def _recheck_profile(
     report: SemanticReport,
     after,
@@ -78,7 +89,7 @@ def _recheck_profile(
     overrides: dict[str, str] | None,
 ) -> SemanticReport:
     """档案模式：重跑逐属性核对，按属性比较前后状态。"""
-    engine = HsiEngine(profile, after.entries)
+    engine = _make_engine(profile, after.entries)
     new_results = engine.check(before.requirements)
     old_by_id = {r.requirement_id: r for r in before.results}
     reqs = {r.id: r for r in before.requirements}

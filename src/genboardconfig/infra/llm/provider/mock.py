@@ -78,7 +78,10 @@ class MockProvider(LLMProvider):
         if "columns" in payload and "requirements" not in payload:
             result = self._identify_columns(payload)
         elif "items" in payload and "requirements" not in payload:
-            result = self._map_symbols(payload)
+            if payload.get("items") and "excel_function" in payload["items"][0]:
+                result = self._review_functions(payload)
+            else:
+                result = self._map_symbols(payload)
         else:
             result = self._check(payload)
         content = json.dumps(result, ensure_ascii=False)
@@ -104,6 +107,43 @@ class MockProvider(LLMProvider):
                     break
             columns.append({"index": idx, "field": field_name, "confidence": 0.8 if field_name else 0.2})
         return {"columns": columns}
+
+    def _review_functions(self, payload: dict) -> dict:
+        """功能名等效关系（离线启发式）。"""
+        results = []
+        for item in payload.get("items", []):
+            excel_fn = _norm_key(item.get("excel_function", ""))
+            header_fn = _norm_key(item.get("header_function", ""))
+            gpio_type = (item.get("excel_gpio_type") or "").upper()
+            options = [_norm_key(o) for o in (item.get("options") or [])]
+            excel_tokens = {t for t in excel_fn.split("_") if len(t) > 1}
+            header_tokens = {t for t in header_fn.split("_") if len(t) > 1}
+            shared = excel_tokens & header_tokens
+            if header_fn in {"GPI", "GPO_PP", "GPO_OD"}:
+                equivalent = True
+                confidence = 0.85
+                reason = f"配置使用通用 GPIO {header_fn} 实现「{excel_fn}」，电气方向匹配"
+            elif shared:
+                equivalent = True
+                confidence = 0.8
+                reason = f"功能名共有关键字 {'/'.join(sorted(shared))}，判定为同一功能"
+            elif header_fn in options or excel_fn in options:
+                equivalent = True
+                confidence = 0.6
+                reason = "功能在该引脚的可选范围内，视为等效"
+            else:
+                equivalent = False
+                confidence = 0.45
+                reason = f"「{excel_fn}」与「{header_fn}」无语义交集，建议人工确认"
+            results.append(
+                {
+                    "requirement_id": item.get("requirement_id", ""),
+                    "equivalent": equivalent,
+                    "confidence": confidence,
+                    "reason": reason,
+                }
+            )
+        return {"results": results}
 
     def _map_symbols(self, payload: dict) -> dict:
         mappings = []

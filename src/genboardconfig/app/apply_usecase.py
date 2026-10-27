@@ -157,6 +157,7 @@ class ApplyUseCase:
             semantic = recheck(
                 outcome.new_text,
                 session.check_result,
+                parser=session.parser,
                 encoding=session.c_parse.encoding,
                 newline=session.c_parse.newline,
                 profile=session.profile,

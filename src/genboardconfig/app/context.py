@@ -24,6 +24,7 @@ class Session:
     warnings: list[str] = field(default_factory=list)
     log_lines: list[str] = field(default_factory=list)
     profile: Any = None
+    parser: Any = None          # 本次核对使用的 C 侧解析器（复检时复用）
 
     @property
     def workdir(self) -> Path:

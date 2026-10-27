@@ -12,8 +12,7 @@ from openpyxl import Workbook  # noqa: E402
 from genboardconfig.app.context import Session  # noqa: E402
 from genboardconfig.app.service_factory import (  # noqa: E402
     build_check_usecase,
-    detect_profile,
-    load_profiles,
+    profile_for_series,
 )
 from genboardconfig.domain.models import CheckStatus  # noqa: E402
 from genboardconfig.infra.settings import load_settings  # noqa: E402
@@ -67,7 +66,7 @@ def _run(tmp_path: Path):
     cfile.write_text(C_FILE, encoding="utf-8")
 
     settings = load_settings()
-    profile = detect_profile(str(excel), load_profiles(settings))
+    profile = profile_for_series(settings, "ntk")
     usecase = build_check_usecase(settings, profile)
     session = Session(excel_path=str(excel), c_path=str(cfile))
     return profile, usecase.run(session, progress=lambda m, p: None, use_llm=False)
@@ -99,7 +98,7 @@ def test_fallback_column_used_when_primary_is_empty(tmp_path: Path):
     cfile.write_text(C_FILE, encoding="utf-8")
 
     settings = load_settings()
-    profile = detect_profile(str(excel), load_profiles(settings))
+    profile = profile_for_series(settings, "ntk")
     usecase = build_check_usecase(settings, profile)
     session = Session(excel_path=str(excel), c_path=str(cfile))
     result = usecase.run(session, progress=lambda m, p: None, use_llm=False)

@@ -20,8 +20,8 @@ from genboardconfig.infra.settings import load_settings  # noqa: E402
 
 def main() -> int:
     settings = load_settings()
-    excel = glob.glob(str(ROOT / "samples" / "*.xlsx"))[0]
-    cfile = str(ROOT / "samples" / "BoardCfg.h")
+    excel = glob.glob(str(ROOT / "samples" / "NTK" / "*.xlsx"))[0]
+    cfile = str(ROOT / "samples" / "NTK" / "BoardCfg.h")
     profile = detect_profile(excel, load_profiles(settings))
 
     uc = build_check_usecase(settings, profile)

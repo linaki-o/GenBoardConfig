@@ -24,6 +24,7 @@ class EntryKind(str, enum.Enum):
     ARRAY_ITEM = "array_item"
     CALL_ARG = "call_arg"
     PORT_BIT = "port_bit"        # 端口位表中的单个位（BitsToByte 的一个实参）
+    RTK_BLOCK = "rtk_block"      # RTK：引脚复用区块 _PIN_<PAD>(_PIN_<PAD>_<FUNC>)
     UNKNOWN = "unknown"
 
 
@@ -124,6 +125,8 @@ class ConfigEntry(BaseModel):
     port: str = ""                   # 端口字母，如 C
     bit: int | None = None           # 位号
     table: str = ""                  # 位表名，如 PORT_C_DEFAULT_OUT
+    function: str = ""               # RTK：区块对应的原理图网络名
+    members: list[str] = Field(default_factory=list)   # RTK：该 pad 可选的复用功能
 
 
 class Evidence(BaseModel):

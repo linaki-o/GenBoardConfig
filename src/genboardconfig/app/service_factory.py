@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from ..infra.llm.orchestrator import LLMOrchestrator
@@ -97,10 +98,46 @@ def build_orchestrator(settings: Settings) -> LLMOrchestrator:
     )
 
 
+# 系列 → 档案 id（保留旧档案名作为别名）
+SERIES_PROFILES = {"ntk": ("ntk", "hsi"), "rtk": ("rtk",)}
+
+
+def profile_for_series(settings: Settings, series: str) -> object | None:
+    """按项目系列取档案（ntk / rtk）。"""
+    if not series or series == "auto":
+        return None
+    from ..domain.profiles import Profile
+
+    profiles = {p.id: p for p in load_profiles(settings)}
+    for candidate in SERIES_PROFILES.get(series, (series,)):
+        if candidate in profiles:
+            return profiles[candidate]
+    return None
+
+
+def detect_series(c_path: str | Path) -> str:
+    """按板级配置文件的特征判断项目系列。
+
+    - 含 ``PORT_<X>_DEFAULT_*`` 端口位表 → NTK
+    - 含 ``#define _PIN_<PAD> (_PIN_<PAD>_<FUNC>)`` 引脚复用 → RTK
+    """
+    try:
+        head = Path(c_path).read_text(encoding="utf-8", errors="replace")[:400000]
+    except Exception:  # noqa: BLE001
+        return "ntk"
+    if re.search(r"^#define\s+_PIN_[A-Z]+\d+\s+\(\s*_PIN_[A-Z]+\d+_[A-Za-z0-9_]+\s*\)",
+                 head, re.M):
+        return "rtk"
+    if re.search(r"#define\s+PORT_[A-Z]_DEFAULT_", head):
+        return "ntk"
+    return "ntk"
+
+
 def build_check_usecase(
     settings: Settings, profile: object | None = None
 ) -> CheckUseCase:
     from ..infra.cconfig.parser import CConfigParser
+    from ..infra.cconfig.rtk_pinshare import RtkPinshareParser
     from ..infra.excel.reader import ExcelParser
 
     aliases = settings.aliases
@@ -109,11 +146,15 @@ def build_check_usecase(
         override = settings.get(f"profiles.{profile.id}.row_filter")
         if override:
             profile.apply_override(override)
-    group_cfg = profile.c_cfg("group") if profile is not None else None
-    table_cfg = profile.c_cfg("port_table") if profile is not None else None
+    if profile is not None and profile.c_cfg("kind") == "pinshare":
+        c_parser = RtkPinshareParser()
+    else:
+        group_cfg = profile.c_cfg("group") if profile is not None else None
+        table_cfg = profile.c_cfg("port_table") if profile is not None else None
+        c_parser = CConfigParser(group_cfg=group_cfg, port_table_cfg=table_cfg)
     return CheckUseCase(
         excel_parser=ExcelParser(settings.column_mapping, profile=profile),
-        c_parser=CConfigParser(group_cfg=group_cfg, port_table_cfg=table_cfg),
+        c_parser=c_parser,
         matcher=build_matcher(aliases),
         rules=build_rules(aliases, threshold),
         planner=build_planner(),

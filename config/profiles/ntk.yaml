@@ -1,11 +1,13 @@
-# HSI 档案：面向 scaler 板级配置头的 GPIO 逐属性核对
+# NTK 系列档案：Novatek 端口位表核对
 #
 # 核对范围（依据实际评审要求收敛）：
 #   C 侧：只核对 PORT_<X>_DEFAULT_{OUT,DIR,PP,PU} 端口位表
 #   Excel：只核对「GPIO  TYPE(输入输出类别)」列为 IN / OUT 的行
 #   引脚来源：Excel 的「PIN Name」列（芯片引脚），不再依赖配置里的信号宏组
-id: hsi
-name: 硬件软件接口表（HSI · 端口位表核对）
+#
+# 与 RTK 的差别见 docs/comparison_rules_rtk.md
+id: ntk
+name: NTK 系列（Novatek 端口位表核对）
 enabled: true
 
 excel:

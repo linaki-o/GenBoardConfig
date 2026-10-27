@@ -22,7 +22,7 @@ from genboardconfig.domain.models import (  # noqa: E402
 from genboardconfig.domain.profiles import Profile  # noqa: E402
 from genboardconfig.infra.cconfig.parser import CConfigParser  # noqa: E402
 
-PROFILE_PATH = Path(__file__).resolve().parents[1] / "config" / "profiles" / "hsi.yaml"
+PROFILE_PATH = Path(__file__).resolve().parents[1] / "config" / "profiles" / "ntk.yaml"
 
 SAMPLE = """#ifndef SAMPLE_H_
 #define SAMPLE_H_

@@ -7,7 +7,7 @@ import re
 import zipfile
 from pathlib import Path
 
-path = glob.glob(r"D:\lk__tool\GenBoardConfig\samples\*.xlsx")[0]
+path = glob.glob(r"D:\lk__tool\GenBoardConfig\samples\NTK\*.xlsx")[0]
 z = zipfile.ZipFile(path)
 xml = z.read("xl/worksheets/sheet2.xml").decode("utf-8")  # HSI
 
