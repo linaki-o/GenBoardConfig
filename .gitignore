@@ -17,3 +17,6 @@ config/secrets.bin
 
 # 工具临时产物
 tools/out/
+report.html
+report.csv
+*.patch
