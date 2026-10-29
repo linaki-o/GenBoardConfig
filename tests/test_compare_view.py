@@ -140,10 +140,6 @@ typedef enum
 def test_rtk_right_pane_keeps_worst_verdict(tmp_path: Path):
     from openpyxl import Workbook
 
-    from genboardconfig.app.service_factory import (
-        build_check_usecase,
-        profile_for_series,
-    )
     from genboardconfig.domain.profiles import Profile
 
     profile = Profile.load(
