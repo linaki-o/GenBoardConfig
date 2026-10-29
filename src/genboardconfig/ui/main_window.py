@@ -510,6 +510,10 @@ class MainWindow(QMainWindow):
         self.lbl_entries.setText(str(result.summary.c_entries))
         self.lbl_llm.setText(
             f"{result.llm_calls} 次 / {result.llm_tokens} tokens"
+            + (f" / 失败 {result.llm_errors}" if result.llm_errors else "")
+        )
+        self.lbl_llm.setStyleSheet(
+            "color:#dc2626;font-weight:600;" if result.llm_errors else "color:#0f172a;"
         )
         self.lbl_hash.setText(result.c_file_hash[:16] or "-")
         stats = result.extra.get("filter_stats") or {}
@@ -527,6 +531,15 @@ class MainWindow(QMainWindow):
             self.lbl_filter.setText("（未启用行过滤）")
             self.lbl_filter.setStyleSheet("color:#0f172a;")
         self.warn_view.setPlainText("\n".join(result.warnings) or "无")
+        # 模型交互日志写入「运行日志」，失败原因同时进入警告区
+        for event in result.llm_events:
+            self._log(f"[模型] {event}")
+        model_errors = [e for e in result.llm_events if e.startswith("✗")]
+        if model_errors:
+            self.warn_view.setPlainText(
+                "\n".join(result.warnings + model_errors) or "\n".join(model_errors)
+            )
+            self.status_label.setText("模型调用失败，残余项需人工确认")
         self.compare_view.set_result(result)
         self._apply_filters()
         self.status_label.setText("核对完成")

@@ -43,6 +43,11 @@ class LLMProvider(abc.ABC):
 
     name = "base"
 
+    @property
+    def model_name(self) -> str:
+        """当前使用的模型名（用于日志展示）。"""
+        return str(getattr(self, "model", "") or self.name)
+
     @abc.abstractmethod
     def complete(self, request: LLMRequest) -> LLMResponse: ...
 

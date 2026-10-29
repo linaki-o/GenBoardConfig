@@ -42,6 +42,7 @@ class OrchestratorStats:
     latency_ms: int = 0
     batches: int = 0
     messages: list[str] = field(default_factory=list)
+    events: list[str] = field(default_factory=list)   # 供界面日志展示
 
 
 class LLMOrchestrator:
@@ -87,6 +88,11 @@ class LLMOrchestrator:
             }
             user = json.dumps(payload, ensure_ascii=False, indent=2)
             system = self._system_prompt("check_gpio")
+            self.stats.events.append(
+                f"→ 请求模型复核 {len(reqs)} 条（后端 {self.provider.name}/"
+                f"{self.provider.model_name}）："
+                + "、".join(f"{r.id}={r.expected_value}" for r in reqs[:5])
+            )
             response = self.provider.complete(
                 LLMRequest(
                     system=system,
@@ -126,6 +132,14 @@ class LLMOrchestrator:
         if not items:
             return out
         payload = {"items": items}
+        self.stats.events.append(
+            f"→ 请求模型判定功能名等效关系 {len(items)} 条"
+            f"（后端 {self.provider.name}/{self.provider.model_name}）："
+            + "、".join(
+                f"{i.get('net_name')}({i.get('excel_function')}↔{i.get('header_function')})"
+                for i in items[:5]
+            )
+        )
         response = self.provider.complete(
             LLMRequest(
                 system=self._system_prompt("review_functions"),
@@ -246,6 +260,16 @@ class LLMOrchestrator:
         if response.error:
             self.stats.errors += 1
             self.stats.messages.append(response.error[:200])
+            self.stats.events.append(
+                f"✗ 模型调用失败（{self.provider.name}/{self.provider.model_name}）："
+                f"{response.error[:300]}"
+            )
+        else:
+            self.stats.events.append(
+                f"✓ 模型调用成功（{self.provider.name}/{self.provider.model_name}）："
+                f"耗时 {response.latency_ms} ms，令牌 "
+                f"{response.usage.prompt_tokens}+{response.usage.completion_tokens}"
+            )
 
     def _fallback(self, batch: list[GPIORequirement], reason: str) -> list[MatchResult]:
         return [

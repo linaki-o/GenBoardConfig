@@ -17,7 +17,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..app.service_factory import SECRET_KEY_NAME, secret_store
+from ..app.service_factory import (
+    SECRET_KEY_NAME,
+    resolve_api_key,
+    secret_store,
+)
 from ..infra.settings import Settings
 
 
@@ -71,6 +75,24 @@ class SettingsDialog(QDialog):
         self.api_key.setEchoMode(QLineEdit.Password)
         self.api_key.setPlaceholderText("留空则使用设置文件中的 llm.api_key")
         form.addRow("API Key", self.api_key)
+
+        key_row = QHBoxLayout()
+        store = secret_store(settings)
+        dpapi_key = store.get(SECRET_KEY_NAME)
+        yaml_key = settings.get("llm.api_key") or ""
+        if dpapi_key:
+            source_text = "系统凭据库（DPAPI）—— 优先级高于配置文件"
+        elif yaml_key:
+            source_text = "配置文件 llm.api_key"
+        else:
+            source_text = "未配置（请在上方填写）"
+        src_label = QLabel(f"当前来源：{source_text}")
+        src_label.setStyleSheet("color:#64748b;font-size:11px;")
+        key_row.addWidget(src_label, 1)
+        self.btn_test = QPushButton("测试连接")
+        self.btn_test.clicked.connect(self._test_connection)
+        key_row.addWidget(self.btn_test)
+        form.addRow("", key_row)
 
         self.temperature = QLineEdit(str(settings.get("llm.temperature", 0.0)))
         form.addRow("temperature", self.temperature)
@@ -137,6 +159,50 @@ class SettingsDialog(QDialog):
         hint.setStyleSheet("color:#64748b;font-size:11px;")
         form.addRow("", hint)
         return box
+
+    def _test_connection(self) -> None:
+        """用当前填写的参数做一次最小请求，立刻暴露鉴权/地址问题。"""
+        from ..infra.llm.provider.base import LLMRequest
+        from ..infra.llm.provider.openai_compatible import OpenAICompatibleProvider
+
+        base_url = self.base_url.text().strip()
+        model = self.model.text().strip()
+        key = self.api_key.text().strip() or resolve_api_key(self.settings)
+        if not base_url:
+            QMessageBox.warning(self, "无法测试", "请先填写 Base URL")
+            return
+        self.btn_test.setEnabled(False)
+        self.btn_test.setText("测试中…")
+        try:
+            provider = OpenAICompatibleProvider(
+                base_url=base_url,
+                api_key=key,
+                model=model,
+                timeout=float(self.settings.get("llm.timeout_seconds", 60)),
+                max_retries=1,
+            )
+            response = provider.complete(
+                LLMRequest(system="连通性测试", user="回复 OK", max_tokens=16)
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "测试失败", f"{type(exc).__name__}: {exc}")
+            return
+        finally:
+            self.btn_test.setEnabled(True)
+            self.btn_test.setText("测试连接")
+        if response.error:
+            QMessageBox.critical(
+                self,
+                "测试失败",
+                f"后端返回错误：\n\n{response.error[:600]}\n\n"
+                "常见原因：API Key 无效/过期、Base URL 错误、模型名不可用。",
+            )
+            return
+        QMessageBox.information(
+            self,
+            "连接正常",
+            f"模型 {model} 调用成功（耗时 {response.latency_ms} ms）。",
+        )
 
     def _save(self) -> None:
         s = self.settings

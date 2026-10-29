@@ -104,6 +104,8 @@ class CheckUseCase:
                 if self.orchestrator
                 else 0
             ),
+            llm_errors=self.orchestrator.stats.errors if self.orchestrator else 0,
+            llm_events=list(self.orchestrator.stats.events) if self.orchestrator else [],
             warnings=session.warnings,
             extra=extra,
         )
@@ -194,7 +196,7 @@ class CheckUseCase:
         for rid, attr in index.items():
             verdict = verdicts.get(rid)
             if verdict is None:
-                attr.notes += "；模型未给出结论，需人工确认"
+                attr.notes += "；" + self._llm_failure_note()
                 continue
             equivalent, confidence, reason = verdict
             if confidence < threshold:
@@ -295,6 +297,15 @@ class CheckUseCase:
             else:
                 attr.notes += "；模型复核未给出确定结论，仍需人工确认"
         report("大模型复核完成", 0.92)
+
+    def _llm_failure_note(self) -> str:
+        """模型未给出结论时，说明原因（调用失败 / 输出非法等）。"""
+        if self.orchestrator and self.orchestrator.stats.messages:
+            return (
+                "模型调用失败，未能复核，需人工确认："
+                f"{self.orchestrator.stats.messages[-1][:160]}"
+            )
+        return "模型未给出结论，需人工确认"
 
     @staticmethod
     def _plan_profile(res) -> None:

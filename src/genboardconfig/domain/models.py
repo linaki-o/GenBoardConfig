@@ -212,5 +212,7 @@ class CheckResult(BaseModel):
     column_mapping: dict[str, str] = Field(default_factory=dict)
     llm_calls: int = 0
     llm_tokens: int = 0
+    llm_errors: int = 0
+    llm_events: list[str] = Field(default_factory=list)   # 模型交互日志（请求/响应/错误）
     warnings: list[str] = Field(default_factory=list)
     extra: dict[str, Any] = Field(default_factory=dict)
