@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from PySide6.QtCore import QTimer  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from genboardconfig.app.service_factory import (  # noqa: E402
     build_check_usecase,
@@ -41,6 +41,9 @@ def main() -> int:
     out = ROOT / "docs" / f"screenshot_compare{suffix}.png"
     app = QApplication.instance() or QApplication(sys.argv)
     apply_style(app)
+    # 离屏环境下模态框会阻塞，屏蔽提示类对话框
+    for name in ("information", "warning", "critical", "question"):
+        setattr(QMessageBox, name, staticmethod(lambda *a, **k: QMessageBox.Ok))
     win = MainWindow()
     win.resize(1600, 960)
     win.show()
@@ -59,11 +62,12 @@ def main() -> int:
     win.session.excel_path = str(excel)
     win.session.c_path = str(cfile)
     result = win.check_usecase.run(
-        win.session, progress=lambda m, p: None, use_llm=True
+        win.session, progress=lambda m, p: None, use_llm=False
     )
     win._on_check_done(result)
     win._select_all_changeable()
-    win._preview_changes()
+    if win._selected_results():
+        win._preview_changes()
 
     def grab():
         win.tabs.setCurrentIndex(2)

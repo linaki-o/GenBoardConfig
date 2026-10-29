@@ -1,4 +1,4 @@
-/********************************************************************************/
+﻿/********************************************************************************/
 /*   Copyright (c) 2021 Realtek Semiconductor Corp. All rights reserved.        */
 /*                                                                              */
 /*   SPDX-License-Identifier: LicenseRef-Realtek-Proprietary                    */
@@ -76,7 +76,7 @@ typedef enum
 // Pinshare : 0x1002
 // MCU Ctrl : 0xFE02 at _PIN_B3_MCU_REG
 //---------------------------------------------------------------------------
-#define _PIN_B3                                 (_PIN_B3_GPI)
+#define _PIN_B3                                 (_PIN_B3_GPO_OD)
 
 typedef enum
 {
@@ -104,7 +104,7 @@ typedef enum
 // Pinshare : 0x1003
 // MCU Ctrl : 0xFE03 at _PIN_B4_MCU_REG
 //---------------------------------------------------------------------------
-#define _PIN_B4                                 (_PIN_B4_GPO_OD)
+#define _PIN_B4                                 (_PIN_B4_GPO_PP)
 
 typedef enum
 {
@@ -341,7 +341,7 @@ typedef enum
 // Pinshare : 0x100D
 // MCU Ctrl : 0xFE0D at _PIN_F2_MCU_REG
 //---------------------------------------------------------------------------
-#define _PIN_F2                                 (_PIN_F2_GPO_PP)
+#define _PIN_F2                                 (_PIN_F2_GPO_OD)
 
 typedef enum
 {
@@ -613,7 +613,7 @@ typedef enum
 // Pinshare : 0x1017
 // MCU Ctrl : 0xFE17 at _PIN_H4_MCU_REG
 //---------------------------------------------------------------------------
-#define _PIN_H4                                 (_PIN_H4_GPI)
+#define _PIN_H4                                 (_PIN_H4_GPO_OD)
 
 typedef enum
 {
@@ -807,7 +807,7 @@ typedef enum
 // Pinshare : 0x101E
 // MCU Ctrl : 0xFE1E at _PIN_AH1_MCU_REG
 //---------------------------------------------------------------------------
-#define _PIN_AH1                                (_PIN_AH1_GPI)
+#define _PIN_AH1                                (_PIN_AH1_GPO_PP)
 
 typedef enum
 {
@@ -2976,7 +2976,7 @@ typedef enum
 // Pinshare : 0x108C
 // MCU Ctrl : 0x222C at _PIN_D10_MCU_REG
 //---------------------------------------------------------------------------
-#define _PIN_D10                                (_PIN_D10_GPO_PP)
+#define _PIN_D10                                (_PIN_D10_GPO_OD)
 
 typedef enum
 {

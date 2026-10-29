@@ -69,14 +69,32 @@ def test_compare_view_shows_both_sides(tmp_path: Path):
     view.set_result(result)
     assert view.left_model.rowCount() == 2          # Excel 行
     assert view.right_model.rowCount() == 6          # 2 行 × 3 属性
-    # 右侧按 Excel 行分组：DIR → PP → OUT
+    # 右侧按 Excel 行分组排列：DIR → PP → OUT
     keys = [
-        view.right_model.data(view.right_model.index(r, 1))
+        view.right_model.data(view.right_model.index(r, 2))
         for r in range(view.right_model.rowCount())
     ]
     assert keys[0].endswith("_DIR[2]")
     assert keys[1].endswith("_PP[2]")
     assert keys[2].endswith("_OUT[2]")
+
+
+def test_right_pane_groups_by_excel_row(tmp_path: Path):
+    """左表 1 行 ↔ 右表 3 行：锚点列相同且连续成组。"""
+    _app()
+    result = _make_result(tmp_path)
+    view = CompareView()
+    view.set_result(result)
+
+    anchors = [
+        view.right_model.data(view.right_model.index(r, 0))
+        for r in range(view.right_model.rowCount())
+    ]
+    # 每个 Excel 行对应连续 3 条，锚点（Excel 行号）相同
+    assert len(anchors) == view.left_model.rowCount() * 3
+    assert len(set(anchors)) == view.left_model.rowCount()
+    for i in range(0, len(anchors), 3):
+        assert anchors[i] == anchors[i + 1] == anchors[i + 2]
 
 
 def test_mismatch_is_colored_red(tmp_path: Path):
@@ -96,10 +114,10 @@ def test_mismatch_is_colored_red(tmp_path: Path):
     # 右侧：对应 OUT 单元格的「实际值」与「判定」为红底
     idx = next(
         r for r in range(view.right_model.rowCount())
-        if view.right_model.data(view.right_model.index(r, 1)).endswith("_OUT[1]")
+        if str(view.right_model.data(view.right_model.index(r, 2))).endswith("_OUT[1]")
     )
-    assert view.right_model.data(view.right_model.index(idx, 4)) == "不一致"
-    bg = view.right_model.data(view.right_model.index(idx, 3), Qt.BackgroundRole)
+    assert view.right_model.data(view.right_model.index(idx, 5)) == "不一致"
+    bg = view.right_model.data(view.right_model.index(idx, 4), Qt.BackgroundRole)
     assert bg is not None and bg.color().name().lower() == "#fef2f2"
 
 
@@ -176,5 +194,5 @@ def test_rtk_right_pane_keeps_worst_verdict(tmp_path: Path):
     view = CompareView()
     view.set_result(result)
     assert view.right_model.rowCount() == 1
-    verdict = view.right_model.data(view.right_model.index(0, 4))
+    verdict = view.right_model.data(view.right_model.index(0, 5))
     assert verdict == "不一致", f"右表判定应为不一致，实际 {verdict}"

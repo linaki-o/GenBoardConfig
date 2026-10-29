@@ -30,6 +30,7 @@ C_BAD_FG = "#b91c1c"
 C_NA_BG = "#f8fafc"
 C_LINK_BG = "#fffbeb"
 C_LINK_FG = "#b45309"
+C_GROUP_BG = "#f1f5f9"      # 分组条带（同一 Excel 行的一组条目）
 
 # 结论严重度：同一条目被多个属性引用时取最严重的一条
 VERDICT_SEVERITY = {
@@ -160,6 +161,9 @@ class ExcelCompareModel(_HighlightModel):
                 elif res.status == CheckStatus.MATCH.value:
                     self._cell_bg[(i, status_col)] = QColor(C_OK_BG)
                     self._cell_fg[(i, status_col)] = QColor(C_OK_FG)
+            # 与右表一致的分组条带（按 Excel 行交替）
+            if i % 2 == 1:
+                self._row_bg[i] = QColor(C_GROUP_BG)
             self._rows.append(cells)
         self.endResetModel()
 
@@ -183,9 +187,13 @@ class ExcelCompareModel(_HighlightModel):
 
 
 class CCompareModel(_HighlightModel):
-    """右侧：板级配置条目（默认只显示与核对相关的位表单元，按 Excel 行分组）。"""
+    """右侧：板级配置条目。
 
-    HEADERS = ["行", "键", "期望值", "实际值", "判定", "定义原文"]
+    每行带「Excel 行」锚点列 —— 同一 Excel 行的 N 个条目（NTK 为 DIR/PP/OUT 三条）
+    连续排列且锚点相同，配合分组条带即可与左表逐行对应。
+    """
+
+    HEADERS = ["Excel 行", "配置行", "键", "期望值", "实际值", "判定", "定义原文"]
 
     def __init__(self):
         super().__init__(list(self.HEADERS))
@@ -197,21 +205,30 @@ class CCompareModel(_HighlightModel):
             font = QFont("Consolas")
             font.setBold(True)
             return font
-        if role == Qt.TextAlignmentRole and index.column() in (0, 6):
+        if role == Qt.TextAlignmentRole and index.column() in (0, 1, 5):
             return int(Qt.AlignCenter)
         return super().data(index, role)
 
-    def set_entries(self, entries, index_of: dict[str, int], extra: dict[str, dict] | None = None) -> None:
-        """extra: entry_id → {期望值, 判定}"""
+    def set_entries(
+        self,
+        entries,
+        index_of: dict[str, int],
+        extra: dict[str, dict] | None = None,
+        groups: dict[str, tuple[int, int]] | None = None,
+    ) -> None:
+        """extra: entry_id → {期望值, 判定}；groups: entry_id → (Excel 行号, 组序号)"""
         self.beginResetModel()
         self._reset(list(self.HEADERS))
         self._entry_ids = []
         self._index_of = index_of
         extra = extra or {}
+        groups = groups or {}
         for entry in entries:
             info = extra.get(entry.id, {})
+            excel_row, _group = groups.get(entry.id, (0, 0))
             self._rows.append(
                 [
+                    excel_row,
                     entry.line,
                     entry.key,
                     info.get("expected", "-"),
@@ -288,7 +305,7 @@ class CompareView(QWidget):
 
         for col, width in {0: 46, 1: 130, 2: 130, 3: 96, 4: 112, 5: 104, 6: 78}.items():
             self.left.setColumnWidth(col, width)
-        for col, width in {0: 46, 1: 205, 2: 96, 3: 78, 4: 86}.items():
+        for col, width in {0: 64, 1: 64, 2: 210, 3: 96, 4: 78, 5: 86}.items():
             self.right.setColumnWidth(col, width)
 
         left_panel = self._panel("Excel 数据（HSI）", self.left)
@@ -347,9 +364,15 @@ class CompareView(QWidget):
         req_index = {r.id: i for i, r in enumerate(result.requirements)}
         entry_extra: dict[str, dict] = {}
         entry_severity: dict[str, int] = {}
+        entry_group: dict[str, tuple[int, int]] = {}
         for res in result.results:
             idx = req_index.get(res.requirement_id, -1)
             ids: list[str] = []
+            excel_row = (
+                result.requirements[idx].row_no
+                if 0 <= idx < len(result.requirements)
+                else 0
+            )
             for attr in res.attribute_results:
                 targets = [ev.entry_id for ev in attr.evidence]
                 change = attr.change
@@ -380,10 +403,13 @@ class CompareView(QWidget):
                             "expected": attr.expected or "-",
                             "verdict": verdict,
                         }
+                    # 锚点：条目属于哪个 Excel 行（第几组）
+                    entry_group[eid] = (excel_row, idx)
             related_by_req[idx] = ids
         self._related_by_req = related_by_req
         self._ordered_ids = ordered_ids
         self._entry_extra = entry_extra
+        self._entry_group = entry_group
 
         self._refresh_right()
 
@@ -402,12 +428,15 @@ class CompareView(QWidget):
             selected = list(entries)
 
         index_of = {e.id: i for i, e in enumerate(selected)}
-        self.right_model.set_entries(selected, index_of, self._entry_extra)
+        self.right_model.set_entries(
+            selected, index_of, self._entry_extra, self._entry_group
+        )
 
         # 着色：不一致 → 红；一致 → 绿；同一张位表的其它位 → 淡黄（上下文）
         cell_bg: dict[tuple[int, int], QColor] = {}
         cell_fg: dict[tuple[int, int], QColor] = {}
         bold: set[tuple[int, int]] = set()
+        row_bg: dict[int, QColor] = {}
         tables_of_bad: set[str] = set()
 
         for eid, info in self._entry_extra.items():
@@ -415,12 +444,12 @@ class CompareView(QWidget):
             if r is None:
                 continue
             bad = info.get("verdict") == "不一致"
-            cell_bg[(r, 3)] = QColor(C_BAD_BG if bad else C_OK_BG)
-            cell_fg[(r, 3)] = QColor(C_BAD_FG if bad else C_OK_FG)
             cell_bg[(r, 4)] = QColor(C_BAD_BG if bad else C_OK_BG)
             cell_fg[(r, 4)] = QColor(C_BAD_FG if bad else C_OK_FG)
-            bold.add((r, 3))
+            cell_bg[(r, 5)] = QColor(C_BAD_BG if bad else C_OK_BG)
+            cell_fg[(r, 5)] = QColor(C_BAD_FG if bad else C_OK_FG)
             bold.add((r, 4))
+            bold.add((r, 5))
             if bad:
                 entry = by_id.get(eid)
                 if entry is not None and entry.table:
@@ -428,8 +457,18 @@ class CompareView(QWidget):
         # 差异所在位表的其它位 → 淡黄（上下文）
         for r, entry in enumerate(selected):
             if entry.table and entry.table in tables_of_bad:
-                cell_bg.setdefault((r, 5), QColor(C_LINK_BG))
-        self.right_model.set_highlights(cell_bg, cell_fg, {}, bold)
+                cell_bg.setdefault((r, 2), QColor(C_LINK_BG))
+        # 分组条带：同一 Excel 行的一组条目用同一底色（交替）
+        last_group = None
+        shade = False
+        for r, entry in enumerate(selected):
+            group = self._entry_group.get(entry.id, (0, -1))[1]
+            if group != last_group:
+                shade = not shade
+                last_group = group
+            if shade:
+                row_bg.setdefault(r, QColor(C_GROUP_BG))
+        self.right_model.set_highlights(cell_bg, cell_fg, row_bg, bold)
 
     # ------------------------------------------------------------------
     def _on_left_selection(self) -> None:
