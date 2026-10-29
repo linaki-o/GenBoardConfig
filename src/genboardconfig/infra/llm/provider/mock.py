@@ -141,6 +141,8 @@ class MockProvider(LLMProvider):
                     "equivalent": equivalent,
                     "confidence": confidence,
                     "reason": reason,
+                    "electrical_match": True if gpio_type in {"IN", "OUT"} else None,
+                    "electrical_reason": f"{header_fn} 与 {gpio_type} 方向兼容",
                 }
             )
         return {"results": results}

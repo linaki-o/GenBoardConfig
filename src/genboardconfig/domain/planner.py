@@ -21,6 +21,25 @@ KIND_TO_CHANGE = {
 }
 
 
+def recompute_status(result: MatchResult) -> None:
+    """按属性结论重算行状态（模型复核后必须调用，否则行状态仍是复核前的值）。"""
+    checkable = [a for a in result.attribute_results if a.checkable]
+    if not checkable:
+        return
+    severity = {
+        CheckStatus.MATCH.value: 0,
+        CheckStatus.NOT_APPLICABLE.value: 1,
+        CheckStatus.UNRESOLVED.value: 2,
+        CheckStatus.AMBIGUOUS.value: 3,
+        CheckStatus.MISSING.value: 4,
+        CheckStatus.MISMATCH.value: 5,
+    }
+    result.status = max(
+        (a.status for a in checkable), key=lambda s: severity.get(s.value, 0)
+    )
+    result.confidence = min((a.confidence for a in checkable), default=result.confidence)
+
+
 def aggregate_attribute_changes(result: MatchResult) -> None:
     """把属性级变更汇总为行级修改建议（档案模式共用）。"""
     changes = [

@@ -128,9 +128,10 @@ class LLMOrchestrator:
                  pad, excel_gpio_type, options:[...]}]
         返回 {requirement_id: (equivalent, confidence, reason)}
         """
-        out: dict[str, tuple[bool, float, str]] = {}
+        out: dict[str, tuple[bool, float, str, bool | None, str]] = {}
         if not items:
             return out
+        net_by_id = {i.get("requirement_id", ""): i.get("net_name", "") for i in items}
         payload = {"items": items}
         self.stats.events.append(
             f"→ 请求模型判定功能名等效关系 {len(items)} 条"
@@ -157,7 +158,22 @@ class LLMOrchestrator:
         except Exception:  # noqa: BLE001
             return out
         for item in parsed.results:
-            out[item.requirement_id] = (item.equivalent, item.confidence, item.reason)
+            out[item.requirement_id] = (
+                item.equivalent,
+                item.confidence,
+                item.reason,
+                item.electrical_match,
+                item.electrical_reason,
+            )
+            net = net_by_id.get(item.requirement_id, item.requirement_id)
+            elec = "" if item.electrical_match is None else (
+                "，电气方向兼容" if item.electrical_match else "，电气方向不兼容"
+            )
+            self.stats.events.append(
+                f"  · {net}：模型判定 "
+                f"{'等效' if item.equivalent else '不等效'}{elec}，"
+                f"置信度 {item.confidence:.2f} —— {item.reason}"
+            )
         if progress:
             progress(f"功能名复核完成：{len(out)}/{len(items)}", 1.0)
         return out

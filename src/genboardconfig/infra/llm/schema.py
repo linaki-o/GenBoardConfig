@@ -70,6 +70,9 @@ class LlmFunctionItem(BaseModel):
     equivalent: bool = False
     confidence: float = 0.0
     reason: str = ""
+    # 选中功能的电气方向/类别是否与 Excel 的 GPIO 类别兼容
+    electrical_match: bool | None = None
+    electrical_reason: str = ""
 
 
 class LlmFunctionResponse(BaseModel):
@@ -93,8 +96,17 @@ FUNCTION_JSON_SCHEMA: dict[str, Any] = {
                         "equivalent": {"type": "boolean"},
                         "confidence": {"type": "number"},
                         "reason": {"type": "string"},
+                        "electrical_match": {"type": "boolean"},
+                        "electrical_reason": {"type": "string"},
                     },
-                    "required": ["requirement_id", "equivalent", "confidence", "reason"],
+                    "required": [
+                        "requirement_id",
+                        "equivalent",
+                        "confidence",
+                        "reason",
+                        "electrical_match",
+                        "electrical_reason",
+                    ],
                 },
             }
         },

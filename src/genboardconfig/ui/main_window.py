@@ -661,8 +661,9 @@ class MainWindow(QMainWindow):
             lines.append("<br><b>逐属性核对</b><table width='100%' cellspacing='0' cellpadding='2'>")
             lines.append(
                 "<tr style='background:#e2e8f0'><th>属性</th><th>期望</th>"
-                "<th>实际</th><th>结论</th></tr>"
+                "<th>实际</th><th>结论</th><th>来源</th></tr>"
             )
+            source_label = {"llm": "模型", "human": "人工", "deterministic": "规则"}
             for attr in res.attribute_results:
                 color = {
                     "mismatch": "#dc2626",
@@ -670,10 +671,25 @@ class MainWindow(QMainWindow):
                     "missing": "#ea580c",
                     "match": "#16a34a",
                 }.get(attr.status.value, "#0f172a")
+                extra = ""
+                if attr.llm_confidence:
+                    extra = (
+                        f"<div style='color:#7c3aed;font-size:11px'>"
+                        f"模型判定：{'等效' if attr.llm_equivalent else '不等效'}"
+                        f"（置信度 {attr.llm_confidence:.2f}）"
+                        f"{('　' + attr.llm_reason) if attr.llm_reason else ''}</div>"
+                    )
+                note = (
+                    f"<div style='color:#64748b;font-size:11px'>{attr.notes}</div>"
+                    if attr.notes
+                    else ""
+                )
                 lines.append(
                     f"<tr><td>{attr.label}</td><td>{self.detail.mono(attr.expected or '-')}</td>"
                     f"<td>{self.detail.mono(attr.actual or '-')}</td>"
-                    f"<td style='color:{color}'>{attr.status.value}</td></tr>"
+                    f"<td style='color:{color}'>{attr.status.value}</td>"
+                    f"<td>{source_label.get(attr.source.value, attr.source.value)}</td></tr>"
+                    f"<tr><td colspan='5'>{extra}{note}</td></tr>"
                 )
             lines.append("</table>")
         elif res.evidence:
@@ -887,6 +903,8 @@ class MainWindow(QMainWindow):
     def _open_settings(self) -> None:
         from .settings_dialog import SettingsDialog
 
+        # 重新从磁盘加载，避免用启动时的旧副本覆盖用户手动改过的配置
+        self.settings = load_settings()
         dlg = SettingsDialog(self.settings, self, self.profile)
         if dlg.exec():
             self.settings = dlg.settings

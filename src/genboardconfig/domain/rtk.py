@@ -442,6 +442,10 @@ class RtkEngine:
             notes=f"Excel 期望功能「{app}」，配置为「{selected}」，需模型判定是否等效",
         )
 
+    def gpio_category(self, req: GPIORequirement) -> str:
+        """该行 Excel 的 GPIO 类别（G 列），用于喂给模型。"""
+        return (self._attr_value(req, "gpio_type") or "").strip().upper()
+
     # ------------------------------------------------------------------
     def _profile_value(self, req: GPIORequirement, field_name: str) -> str:
         for attr in req.attributes:

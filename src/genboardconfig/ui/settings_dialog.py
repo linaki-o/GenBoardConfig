@@ -109,6 +109,16 @@ class SettingsDialog(QDialog):
         self.structured = QCheckBox("请求端 JSON Schema 约束输出")
         self.structured.setChecked(bool(settings.get("llm.use_structured_output", True)))
         form.addRow("", self.structured)
+        self.llm_threshold = QSpinBox()
+        self.llm_threshold.setRange(0, 100)
+        self.llm_threshold.setValue(
+            int(float(settings.get("check.llm_confidence_threshold", 0.7)) * 100)
+        )
+        self.llm_threshold.setSuffix(" %")
+        form.addRow("模型采纳阈值", self.llm_threshold)
+        threshold_hint = QLabel("模型结论置信度低于该值时不采纳，仍标记为需人工确认")
+        threshold_hint.setStyleSheet("color:#64748b;font-size:11px;")
+        form.addRow("", threshold_hint)
         root.addWidget(llm_box)
 
         check_box = QGroupBox("核对策略")
@@ -220,6 +230,10 @@ class SettingsDialog(QDialog):
         s.set("llm.max_batch_size", self.batch.value())
         s.set("llm.max_retries", self.retries.value())
         s.set("llm.use_structured_output", self.structured.isChecked())
+        s.set(
+            "check.llm_confidence_threshold",
+            round(self.llm_threshold.value() / 100.0, 2),
+        )
         s.set("check.use_llm", self.use_llm.isChecked())
         s.set("privacy.mask_sensitive", self.mask.isChecked())
         s.set("check.series", self.series_combo.currentData() or "auto")

@@ -160,6 +160,7 @@ def build_check_usecase(
         planner=build_planner(),
         orchestrator=build_orchestrator(settings),
         profile=profile,
+        settings=settings,
     )
 
 

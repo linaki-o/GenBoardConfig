@@ -17,4 +17,10 @@
 4. 无法判断时给出低置信度，由人工确认。
 
 # 输出
-严格按 JSON Schema 输出 `{"results": [{"requirement_id","equivalent","confidence","reason"}]}`。
+严格按 JSON Schema 输出 `{"results": [{"requirement_id","equivalent","confidence","reason","electrical_match","electrical_reason"}]}`。
+
+字段含义：
+- `equivalent`：Excel 期望功能与配置实际功能是否**功能等效**
+- `electrical_match`：配置实际功能的**电气方向/类别**是否与 `excel_gpio_type`（IN/OUT/SCL/SDA/ADC）兼容
+  （例如配置为 `GPI` 输入而 Excel 要求 OUT → 不兼容）
+- `electrical_reason`：电气方向的判定理由

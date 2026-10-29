@@ -19,7 +19,7 @@ from ..domain.models import (
     GPIORequirement,
     Source,
 )
-from ..domain.planner import Planner, aggregate_attribute_changes
+from ..domain.planner import Planner, aggregate_attribute_changes, recompute_status
 from ..domain.profiles import Profile
 from ..domain.rules import RuleEngine
 from ..domain.rtk import RtkEngine
@@ -39,6 +39,7 @@ class CheckUseCase:
         planner: Planner,
         orchestrator: LLMOrchestrator | None = None,
         profile: Profile | None = None,
+        settings: object | None = None,
     ):
         self.excel_parser = excel_parser
         self.c_parser = c_parser
@@ -47,6 +48,7 @@ class CheckUseCase:
         self.planner = planner
         self.orchestrator = orchestrator
         self.profile = profile
+        self.settings = settings
         self._symbol_overrides: dict[str, str] = {}
 
     # ------------------------------------------------------------------
@@ -181,7 +183,8 @@ class CheckUseCase:
                     "excel_function": attr.expected,
                     "header_function": attr.actual,
                     "pad": entry.group,
-                    "excel_gpio_type": attr.expected,
+                    # 喂给模型的 GPIO 类别必须取 G 列，不能误传期望功能名
+                    "excel_gpio_type": engine.gpio_category(req),
                     "options": [m.split("_", 3)[-1] for m in entry.members][:20],
                 }
             )
@@ -192,20 +195,52 @@ class CheckUseCase:
         verdicts = self.orchestrator.review_functions(
             items, progress=lambda msg, p: report(msg, 0.75 + 0.15 * p)
         )
-        threshold = float(self.profile.c_cfg("llm_confidence_threshold", default=0.7))
+        threshold = self._llm_threshold()
+        res_by_id = {r.requirement_id: r for r in results}
         for rid, attr in index.items():
             verdict = verdicts.get(rid)
             if verdict is None:
                 attr.notes += "；" + self._llm_failure_note()
                 continue
-            equivalent, confidence, reason = verdict
+            equivalent, confidence, reason, electrical, electrical_reason = verdict
+            attr.llm_equivalent = equivalent
+            attr.llm_confidence = confidence
+            attr.llm_reason = reason
             if confidence < threshold:
-                attr.notes += f"；模型置信度 {confidence:.2f} 不足，仍需人工确认"
+                attr.notes += (
+                    f"；模型判定：{'等效' if equivalent else '不等效'}"
+                    f"（置信度 {confidence:.2f} 低于阈值 {threshold:.2f}，未采纳，待人工确认）"
+                    f"——{reason}"
+                )
                 continue
             attr.status = CheckStatus.MATCH if equivalent else CheckStatus.MISMATCH
             attr.confidence = confidence
             attr.source = Source.LLM
-            attr.notes += f"；模型判定：{'等效' if equivalent else '不等效'}（{reason}）"
+            attr.notes += (
+                f"；模型判定：{'等效' if equivalent else '不等效'}"
+                f"（置信度 {confidence:.2f}）——{reason}"
+            )
+            # 电气方向结论同时用于解决该行「方向/类别」属性的歧义
+            if electrical is not None:
+                owner = res_by_id.get(rid)
+                elec_attr = owner.attribute("elec_type") if owner else None
+                if elec_attr is not None and elec_attr.status == CheckStatus.AMBIGUOUS:
+                    elec_attr.status = (
+                        CheckStatus.MATCH if electrical else CheckStatus.MISMATCH
+                    )
+                    elec_attr.confidence = confidence
+                    elec_attr.source = Source.LLM
+                    elec_attr.llm_equivalent = electrical
+                    elec_attr.llm_confidence = confidence
+                    elec_attr.llm_reason = electrical_reason or reason
+                    elec_attr.notes += (
+                        f"；模型判定电气方向"
+                        f"{'兼容' if electrical else '不兼容'}"
+                        f"（置信度 {confidence:.2f}）——{electrical_reason or reason}"
+                    )
+        # 模型复核后必须重算行状态，否则行状态仍是复核前的「歧义」
+        for res in results:
+            recompute_status(res)
         report("大模型复核完成", 0.92)
 
     @staticmethod
@@ -291,12 +326,24 @@ class CheckUseCase:
                 attr.status = lr.status
                 attr.confidence = lr.confidence
                 attr.source = Source.LLM
+                attr.llm_equivalent = lr.status == CheckStatus.MATCH
+                attr.llm_confidence = lr.confidence
+                attr.llm_reason = lr.notes
                 attr.notes += f"；模型复核：{lr.notes}"
                 if lr.status == CheckStatus.MISMATCH and lr.proposed_change.type != "none":
                     attr.change = lr.proposed_change
             else:
                 attr.notes += "；模型复核未给出确定结论，仍需人工确认"
+        for res in results:
+            recompute_status(res)
         report("大模型复核完成", 0.92)
+
+    def _llm_threshold(self) -> float:
+        """模型结论采纳阈值：设置项优先，其次档案默认值。"""
+        default = float(self.profile.c_cfg("llm_confidence_threshold", default=0.7))
+        if self.settings is None:
+            return default
+        return float(self.settings.get("check.llm_confidence_threshold", default))
 
     def _llm_failure_note(self) -> str:
         """模型未给出结论时，说明原因（调用失败 / 输出非法等）。"""

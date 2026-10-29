@@ -185,6 +185,10 @@ class AttributeResult(BaseModel):
     change: ProposedChange | None = None
     source: Source = Source.DETERMINISTIC
     notes: str = ""
+    # —— 模型复核痕迹 ——
+    llm_equivalent: bool | None = None   # 模型判定是否等效
+    llm_confidence: float = 0.0          # 模型置信度
+    llm_reason: str = ""                 # 模型给出的理由
 
 
 class CheckSummary(BaseModel):
