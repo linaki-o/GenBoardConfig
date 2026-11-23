@@ -101,6 +101,15 @@ def build_orchestrator(settings: Settings) -> LLMOrchestrator:
 # 系列 → 档案 id（保留旧档案名作为别名）
 SERIES_PROFILES = {"ntk": ("ntk", "hsi"), "rtk": ("rtk",)}
 
+# PINSHARE 区块特征：必须同时具备 `// Pinshare :` 注释与 `#define <宏> (<宏>_<功能>)`
+# （只用后者会误判：NTK 的 BoardCfg.h 里有 `#define AUDIO_OUT (LINE_OUT)` 这类普通宏）
+RE_PINSHAARE_MARK = re.compile(r"^\s*//\s*Pinshare\s*:", re.M)
+RE_PINSHAARE_DEFINE = re.compile(
+    r"^\s*#define\s+[A-Za-z_][A-Za-z0-9_]*\s+"
+    r"\(\s*[A-Za-z_][A-Za-z0-9_]*_[A-Za-z0-9_]+\s*\)",
+    re.M,
+)
+
 
 def profile_for_series(settings: Settings, series: str) -> object | None:
     """按项目系列取档案（ntk / rtk）。"""
@@ -119,14 +128,16 @@ def detect_series(c_path: str | Path) -> str:
     """按板级配置文件的特征判断项目系列。
 
     - 含 ``PORT_<X>_DEFAULT_*`` 端口位表 → NTK
-    - 含 ``#define _PIN_<PAD> (_PIN_<PAD>_<FUNC>)`` 引脚复用 → RTK
+    - 含 PINSHARE 引脚复用区块 → RTK
+
+    RTK 的判定不依赖 ``_PIN_`` 前缀：Realtek 两种命名都有
+    ``// Pinshare :`` 注释，且都有 ``#define <宏> (<宏>_<功能>)`` 形式。
     """
     try:
         head = Path(c_path).read_text(encoding="utf-8", errors="replace")[:400000]
     except Exception:  # noqa: BLE001
         return "ntk"
-    if re.search(r"^#define\s+_PIN_[A-Z]+\d+\s+\(\s*_PIN_[A-Z]+\d+_[A-Za-z0-9_]+\s*\)",
-                 head, re.M):
+    if RE_PINSHAARE_MARK.search(head) and RE_PINSHAARE_DEFINE.search(head):
         return "rtk"
     if re.search(r"#define\s+PORT_[A-Z]_DEFAULT_", head):
         return "ntk"

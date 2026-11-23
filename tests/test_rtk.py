@@ -211,3 +211,124 @@ def test_writeback_changes_define_suffix_only():
     assert "_PIN_D10_GPO_PP = 0x01," in new_text
     # 其它行不受影响
     assert "#define _PIN_C1                  (_PIN_C1_GPO_OD)" in new_text
+
+
+# ---------------------------------------------------------------------------
+# 新式 Realtek 宏名（_LQFP216_..._PIN_201）与条件编译分支
+# ---------------------------------------------------------------------------
+
+NEW_SAMPLE = """//---------------------------------------------------------------------------
+// Function : EE_WP
+// Pinshare : 0x1000
+// MCU Ctrl : 0xFE00 at _LQFP216_3D_USB_DDRX1_LVDS_PIN_201_MCU_REG
+//---------------------------------------------------------------------------
+#define _LQFP216_3D_USB_DDRX1_LVDS_PIN_201                  (_LQFP216_3D_USB_DDRX1_LVDS_PIN_201_GPO_OD)
+
+typedef enum
+{
+    _LQFP216_3D_USB_DDRX1_LVDS_PIN_201_GPI = 0x00,
+    _LQFP216_3D_USB_DDRX1_LVDS_PIN_201_GPO_PP = 0x01,
+    _LQFP216_3D_USB_DDRX1_LVDS_PIN_201_GPO_OD = 0x02,
+    _LQFP216_3D_USB_DDRX1_LVDS_PIN_201_NC = _LQFP216_3D_USB_DDRX1_LVDS_PIN_201_GPO_PP,
+} EnumPinshareInfoLQFP216_3D_USB_DDRx1_LVDS_PIN_201;
+
+//---------------------------------------------------------------------------
+// Function : PANEL_SCL
+// Pinshare : 0x104D
+//---------------------------------------------------------------------------
+#if(_ACER_OSD_DFR_SUPPORT != _DFR_OFF)
+#define _LQFP216_3D_USB_DDRX1_LVDS_PIN_114                  (_LQFP216_3D_USB_DDRX1_LVDS_PIN_114_GPO_OD)
+#else
+#define _LQFP216_3D_USB_DDRX1_LVDS_PIN_114                  (_LQFP216_3D_USB_DDRX1_LVDS_PIN_114_NC)
+#endif
+
+typedef enum
+{
+    _LQFP216_3D_USB_DDRX1_LVDS_PIN_114_GPI = 0x00,
+    _LQFP216_3D_USB_DDRX1_LVDS_PIN_114_GPO_OD = 0x01,
+    _LQFP216_3D_USB_DDRX1_LVDS_PIN_114_NC = _LQFP216_3D_USB_DDRX1_LVDS_PIN_114_GPO_OD,
+} EnumPinshareInfoLQFP216_3D_USB_DDRx1_LVDS_PIN_114;
+
+//---------------------------------------------------------------------------
+// Function : NC
+// Pinshare : 0x1036 at _OFF_Region
+//---------------------------------------------------------------------------
+#define _LQFP216_3D_USB_DDRX1_LVDS_PIN_48_OFF_REGION        (_LQFP216_3D_USB_DDRX1_LVDS_PIN_48_NC)
+"""
+
+
+def test_parser_handles_new_style_macro_names():
+    """新版 Realtek 宏名（封装+引脚编号）也能解析出复用功能与落点。"""
+    parser = RtkPinshareParser()
+    result = parser.parse_text(NEW_SAMPLE)
+    entry = next(e for e in result.entries if e.function == "EE_WP")
+    assert entry.value_raw == "GPO_OD"
+    assert entry.group == "201"          # 引脚标识取 _PIN_ 之后的编号
+    assert entry.owner == "_LQFP216_3D_USB_DDRX1_LVDS_PIN_201"
+    assert entry.members == ["GPI", "GPO_PP", "GPO_OD", "NC"]   # 成员为相对宏名的后缀
+
+
+def test_parser_skips_off_region_defines():
+    """`..._OFF_REGION (_..._NC)` 不是本宏的复用选择，应被跳过。"""
+    parser = RtkPinshareParser()
+    result = parser.parse_text(NEW_SAMPLE)
+    assert not any(e.function == "NC" for e in result.entries)
+    assert all(e.value_raw != "NC" or e.owner.endswith("_PIN_201") for e in result.entries)
+
+
+def test_parser_prefers_unconditional_branch():
+    """同一 pad 多分支条件编译时，优先取无条件分支，并记录所选分支条件。"""
+    parser = RtkPinshareParser()
+    result = parser.parse_text(NEW_SAMPLE)
+    entry = next(e for e in result.entries if e.function == "PANEL_SCL")
+    assert entry.value_raw == "GPO_OD"
+    assert entry.condition == "#if _ACER_OSD_DFR_SUPPORT != _DFR_OFF"
+
+
+def test_parser_warns_when_no_selection_found():
+    """识别到区块但解析不出选择时必须给出警告，不能静默返回 0 条目。"""
+    parser = RtkPinshareParser()
+    text = (
+        "//---------------------------------------------------------------------------\n"
+        "// Function : EE_WP\n"
+        "// Pinshare : 0x1000\n"
+        "//---------------------------------------------------------------------------\n"
+        "#define SOMETHING_ELSE          (OTHER_VALUE)\n"
+    )
+    result = parser.parse_text(text)
+    assert result.entries == []
+    assert result.warnings and "未能" in result.warnings[0]
+
+
+def test_detect_series_recognizes_new_style_pinshare(tmp_path):
+    """新式宏名的 PINSHARE 头文件必须被识别为 RTK，而不是 NTK。"""
+    from genboardconfig.app.service_factory import detect_series
+
+    path = tmp_path / "new_pinshare.h"
+    path.write_text(NEW_SAMPLE, encoding="utf-8")
+    assert detect_series(path) == "rtk"
+
+
+def test_new_style_sample_matches_network_name():
+    """新式头文件按网络名建立映射，可被 Excel 侧命中。"""
+    parser = RtkPinshareParser()
+    result = parser.parse_text(NEW_SAMPLE)
+    engine = RtkEngine(_profile(), result.entries)
+    assert "EE_WP" in engine.by_function
+    assert engine.by_function["EE_WP"].value_raw == "GPO_OD"
+
+
+def test_detect_series_on_real_samples():
+    """系列判定必须准确：NTK 不得被 PINSHARE 特征误判为 RTK。"""
+    from genboardconfig.app.service_factory import detect_series
+
+    root = Path(__file__).resolve().parents[1] / "samples"
+    ntk = root / "NTK" / "BoardCfg.h"
+    if ntk.exists():
+        # NTK 的 BoardCfg.h 里有 `#define AUDIO_OUT (LINE_OUT)` 这类普通宏，
+        # 不能只靠 define 形态判定为 RTK
+        assert detect_series(ntk) == "ntk"
+    for folder in ("RTK", "RTK_NEW"):
+        headers = list((root / folder).glob("*.h")) if (root / folder).exists() else []
+        for header in headers:
+            assert detect_series(header) == "rtk", header.name

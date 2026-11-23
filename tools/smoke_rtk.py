@@ -1,6 +1,6 @@
 """RTK 端到端：Excel(HSI) × PINSHARE 头文件，核对 + 写回（副本上）。
 
-python tools/smoke_rtk.py
+python tools/smoke_rtk.py [样例目录名]      # 默认 samples/RTK
 """
 
 from __future__ import annotations
@@ -24,11 +24,12 @@ from genboardconfig.infra.settings import load_settings  # noqa: E402
 
 
 def main() -> int:
-    rtk = ROOT / "samples" / "RTK"
+    sample = sys.argv[1] if len(sys.argv) > 1 else "RTK"
+    rtk = ROOT / "samples" / sample
     excels = list(rtk.glob("*.xlsx")) + list(rtk.glob("*.XLSX"))
     headers = list(rtk.glob("*.h"))
     if not excels or not headers:
-        print("未找到 RTK 样例")
+        print(f"未找到 {sample} 样例")
         return 1
     excel_src, c_src = excels[0], headers[0]
 

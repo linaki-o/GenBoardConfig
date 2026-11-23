@@ -46,12 +46,18 @@ excel:
       PWM: OUT
       "I/O": "I/O"
       IO: "I/O"
+      "I/O: Bi-direction": "I/O"
     io_type:
       OPEN-DRAIN OUTPUT: GPO_OD
       PUSH-PULL OUTPUT: GPO_PP
       OPEN DRAIN: GPO_OD
       PUSH-PULL: GPO_PP
       PUSH PULL: GPO_PP
+      OPEN-DRAIN PWM: GPO_OD
+      PUSH-PULL PWM: GPO_PP
+
+  # 单元格为「不适用」占位值时不参与判定（仍显示原文）
+  na_values: ["NA", "N/A", "-", "--", "NONE", "NULL", "X"]
 
 c_config:
   kind: pinshare
@@ -70,6 +76,8 @@ c_config:
   expected_io:
     OPEN-DRAIN OUTPUT: GPO_OD
     PUSH-PULL OUTPUT: GPO_PP
+    OPEN-DRAIN PWM: GPO_OD
+    PUSH-PULL PWM: GPO_PP
 
   # 专用功能 → 电气类别（用于「Excel G 列 ↔ .h 专用功能」比对）
   function_category:

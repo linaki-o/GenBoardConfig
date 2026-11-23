@@ -185,7 +185,7 @@ class CheckUseCase:
                     "pad": entry.group,
                     # 喂给模型的 GPIO 类别必须取 G 列，不能误传期望功能名
                     "excel_gpio_type": engine.gpio_category(req),
-                    "options": [m.split("_", 3)[-1] for m in entry.members][:20],
+                    "options": list(entry.members)[:20],
                 }
             )
             index[rid] = attr
