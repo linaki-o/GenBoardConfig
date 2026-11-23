@@ -51,6 +51,7 @@ from ..domain.models import (
 from ..infra.settings import Settings, load_settings
 from .models import ResultTableModel, entries_model, excel_model
 from .compare_view import CompareView
+from .delegates import RowBorderDelegate
 from .widgets import DiffView, SidePanel, StatCards
 from .workers import Worker
 
@@ -248,6 +249,8 @@ class MainWindow(QMainWindow):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setAlternatingRowColors(True)
+        # 选中行用加重边框标示，不用底色覆盖状态列的红/绿配色
+        self.table.setItemDelegate(RowBorderDelegate(self.table))
         self.table.verticalHeader().setVisible(False)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._table_menu)

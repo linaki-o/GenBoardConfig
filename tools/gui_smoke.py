@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tools"))
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from genboardconfig.ui.main_window import MainWindow  # noqa: E402
 from genboardconfig.ui.style import apply_style  # noqa: E402
@@ -22,6 +22,10 @@ from sample_gen import build_c, build_excel  # noqa: E402
 
 def main() -> int:
     import tempfile
+
+    # 离屏环境下模态框会阻塞，屏蔽提示类对话框
+    for name in ("information", "warning", "critical", "question"):
+        setattr(QMessageBox, name, staticmethod(lambda *a, **k: QMessageBox.Ok))
 
     tmp = Path(tempfile.mkdtemp(prefix="gbc_gui_"))
     samples = ROOT / "samples" / "NTK"
@@ -43,13 +47,13 @@ def main() -> int:
     win = MainWindow()
     win.excel_edit.setText(str(excel))
     win.c_edit.setText(str(cfile))
+    # 冒烟测试必须自洽：不依赖本机 settings.local.yaml（模型后端 / 项目系列），
+    # 固定离线 Mock + 自动识别系列
+    win.settings.set("llm.provider", "mock")
+    win.settings.set("check.series", "auto")
     win._detect_profile()
-    # 样例的 GPIO TYPE 列为空 → 用 Chip Section 过滤以走通完整核对链路
-    if win.profile is not None:
-        win.profile.apply_override(
-            {"field": "chip_section", "values": ["Output", "Input"]}
-        )
-        win.check_usecase = build_check_usecase(win.settings, win.profile)
+    # 用档案默认的行过滤（GPIO TYPE ∈ IN/OUT）走通完整核对链路
+    win.check_usecase = build_check_usecase(win.settings, win.profile)
     win._update_actions()
     win.show()
 

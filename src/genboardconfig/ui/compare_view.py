@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..domain.models import CheckResult, CheckStatus
+from .delegates import RowBorderDelegate
 
 C_BG = "#f1f5f9"
 C_OK_BG = "#f0fdf4"
@@ -299,6 +300,8 @@ class CompareView(QWidget):
             table.setSelectionMode(QAbstractItemView.ExtendedSelection)
             table.verticalHeader().setVisible(False)
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            # 选中行用加重边框标示，不用底色覆盖绿/红判定色
+            table.setItemDelegate(RowBorderDelegate(table))
             header = table.horizontalHeader()
             header.setSectionResizeMode(QHeaderView.Interactive)
             header.setStretchLastSection(True)

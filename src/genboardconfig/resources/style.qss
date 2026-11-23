@@ -56,7 +56,9 @@ QTableView {
     alternate-background-color: #f8fafc;
 }
 QTableView::item { padding: 3px 4px; }
-QTableView::item:selected { background: #dbeafe; color: #0f172a; }
+/* 选中态不设底色/文字色，避免覆盖状态列的红绿配色；
+   选中行由 RowBorderDelegate 描粗边框标示。 */
+QTableView::item:selected { border: 2px solid #1d4ed8; }
 QHeaderView::section {
     background: #f1f5f9;
     color: #334155;
