@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenBoardConfig 使用 SOP（GPIO 配置核对工具）</title>
+<style>
+:root{
+  --ink:#0f172a; --ink2:#334155; --muted:#64748b; --line:#e2e8f0; --line2:#cbd5e1;
+  --bg:#f8fafc; --card:#ffffff; --brand:#2563eb; --brand-d:#1d4ed8; --brand-l:#eff6ff;
+  --ok:#16a34a; --ok-l:#f0fdf4; --bad:#dc2626; --bad-l:#fef2f2; --warn:#ca8a04; --warn-l:#fefce8;
+  --na:#64748b; --na-l:#f1f5f9; --purple:#7c3aed; --purple-l:#f5f3ff; --orange:#ea580c; --orange-l:#fff7ed;
+  --mono:"Cascadia Mono","Consolas","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+  font-size:15px; line-height:1.75; -webkit-font-smoothing:antialiased;
+}
+a{color:var(--brand);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{display:flex;max-width:1480px;margin:0 auto;gap:0}
+nav.toc{
+  width:270px;flex:0 0 270px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  background:var(--card);border-right:1px solid var(--line);padding:22px 0 40px;
+}
+nav.toc .brand{padding:0 22px 14px;border-bottom:1px solid var(--line);margin-bottom:12px}
+nav.toc .brand b{display:block;font-size:16px;letter-spacing:.2px}
+nav.toc .brand span{font-size:12px;color:var(--muted)}
+nav.toc a{display:block;padding:6px 22px 6px 30px;font-size:13.5px;color:var(--ink2);border-left:3px solid transparent}
+nav.toc a:hover{background:var(--brand-l);color:var(--brand);text-decoration:none;border-left-color:var(--brand)}
+nav.toc a.sub{padding-left:44px;font-size:13px;color:var(--muted)}
+nav.toc a.h2{font-weight:700;color:var(--ink);margin-top:10px}
+main{flex:1;min-width:0;padding:34px 44px 120px}
+.hero{
+  background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 55%,#0ea5e9 100%);
+  color:#fff;border-radius:16px;padding:38px 40px;margin-bottom:26px;
+  box-shadow:0 12px 30px rgba(37,99,235,.22);
+}
+.hero h1{margin:0 0 8px;font-size:29px;letter-spacing:.3px}
+.hero p{margin:0 0 18px;opacity:.92;font-size:15px}
+.hero .meta{display:flex;flex-wrap:wrap;gap:10px}
+.hero .meta span{background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.26);padding:4px 12px;border-radius:999px;font-size:12.5px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 32px;margin-bottom:22px}
+section>h2{margin:0 0 6px;font-size:22px;display:flex;align-items:center;gap:11px;padding-bottom:12px;border-bottom:2px solid var(--line)}
+section>h2 .no{background:var(--brand);color:#fff;width:32px;height:32px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 32px}
+h3{font-size:16.5px;margin:26px 0 10px;padding-left:11px;border-left:4px solid var(--brand);line-height:1.4}
+h4{font-size:14.5px;margin:18px 0 8px;color:var(--ink2)}
+p{margin:9px 0}
+ul,ol{margin:9px 0;padding-left:22px}
+li{margin:5px 0}
+code{font-family:var(--mono);font-size:13px;background:#f1f5f9;border:1px solid var(--line);padding:1.5px 6px;border-radius:5px;color:#be123c}
+pre{font-family:var(--mono);font-size:13px;background:#0f172a;color:#cbd5e1;padding:14px 16px;border-radius:10px;overflow-x:auto;line-height:1.65;margin:12px 0}
+pre code{background:none;border:none;color:inherit;padding:0;font-size:13px}
+pre .c{color:#64748b}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;background:var(--card)}
+th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+th{background:#f1f5f9;font-weight:700;color:var(--ink2);font-size:13.5px}
+tbody tr:nth-child(even){background:#fcfdfe}
+tbody tr:hover{background:var(--brand-l)}
+table.tight td,table.tight th{padding:6px 9px;font-size:13.5px}
+.note{border-radius:10px;padding:13px 16px;margin:14px 0;font-size:14px;border-left:4px solid;line-height:1.7}
+.note>b:first-child{display:block;margin-bottom:3px}
+.note.tip{background:var(--brand-l);border-color:var(--brand);color:#1e3a8a}
+.note.warn{background:var(--warn-l);border-color:var(--warn);color:#78350f}
+.note.danger{background:var(--bad-l);border-color:var(--bad);color:#7f1d1d}
+.note.ok{background:var(--ok-l);border-color:var(--ok);color:#14532d}
+.step{border:1px solid var(--line);border-left:5px solid var(--brand);border-radius:10px;padding:18px 22px;margin:18px 0;background:#fff}
+.step>.hd{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.step>.hd .n{width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:0 0 28px}
+.step>.hd h3{margin:0;padding:0;border:none;font-size:16.5px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-ok{background:var(--ok-l);color:var(--ok);border:1px solid #bbf7d0}
+.b-bad{background:var(--bad-l);color:var(--bad);border:1px solid #fecaca}
+.b-warn{background:var(--warn-l);color:var(--warn);border:1px solid #fde68a}
+.b-na{background:var(--na-l);color:var(--na);border:1px solid var(--line2)}
+.b-pur{background:var(--purple-l);color:var(--purple);border:1px solid #ddd6fe}
+.b-org{background:var(--orange-l);color:var(--orange);border:1px solid #fed7aa}
+.b-info{background:var(--brand-l);color:var(--brand);border:1px solid #bfdbfe}
+figure{margin:20px 0;text-align:center}
+figcaption{font-size:13px;color:var(--muted);margin-top:9px;text-align:left;padding-left:2px}
+figcaption b{color:var(--ink2)}
+.svg-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+.svg-scroll svg{display:block;min-width:900px;width:100%;height:auto}
+.anno{position:relative;display:block;line-height:0}
+.anno img{width:100%;border:1px solid var(--line);border-radius:10px;display:block}
+.anno .pin{
+  position:absolute;transform:translate(-50%,-50%);width:27px;height:27px;border-radius:50%;
+  background:var(--brand);color:#fff;font-size:14px;font-weight:700;line-height:27px;
+  text-align:center;box-shadow:0 2px 7px rgba(15,23,42,.45);border:2.5px solid #fff;
+}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px;margin:14px 0}
+.kv div{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.kv div b{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:3px}
+.kv div span{font-size:14px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0;font-size:13px;color:var(--ink2)}
+.legend i{display:inline-block;width:13px;height:13px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.09)}
+.tree{font-family:var(--mono);font-size:13px;line-height:1.85;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:16px 20px;overflow-x:auto;white-space:pre}
+.tree .hl{color:var(--brand);font-weight:700}
+.toc-mini{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.toc-mini a{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-size:13px;color:var(--ink2)}
+.toc-mini a:hover{border-color:var(--brand);color:var(--brand);text-decoration:none;background:var(--brand-l)}
+@media print{
+  nav.toc{display:none}
+  body{background:#fff;font-size:11.5pt}
+  main{padding:0}
+  section{break-inside:avoid;page-break-inside:avoid;border:none;padding:0 0 18px}
+  .hero{box-shadow:none}
+}
+@media (max-width:1100px){
+  nav.toc{display:none}
+  main{padding:20px 18px 80px}
+  section{padding:20px 18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc">
+  <div class="brand">
+    <b>GenBoardConfig</b>
+    <span>GPIO 配置核对工具 · 使用 SOP</span>
+  </div>
+  <a class="h2" href="#s0">0 · 工具与适用范围</a>
+  <a class="sub" href="#s0-1">适用场景</a>
+  <a class="sub" href="#s0-2">工作原理</a>
+  <a class="h2" href="#s1">1 · 环境准备与启动</a>
+  <a class="sub" href="#s1-1">一键启动</a>
+  <a class="sub" href="#s1-2">命令行启动</a>
+  <a class="sub" href="#s1-3">安装自检</a>
+  <a class="h2" href="#s2">2 · 界面分区总览</a>
+  <a class="h2" href="#s3">3 · 标准操作流程</a>
+  <a class="sub" href="#s3-1">步骤 1 · 选择文件</a>
+  <a class="sub" href="#s3-2">步骤 2 · 开始核对</a>
+  <a class="sub" href="#s3-3">步骤 3 · 审阅结果</a>
+  <a class="sub" href="#s3-4">步骤 4 · 勾选行</a>
+  <a class="sub" href="#s3-5">步骤 5 · 预览修改</a>
+  <a class="sub" href="#s3-6">步骤 6 · 应用修改</a>
+  <a class="h2" href="#s4">4 · 状态判定与图例</a>
+  <a class="h2" href="#s5">5 · NTK / RTK 规则差异</a>
+  <a class="sub" href="#s5-1">NTK 端口位表</a>
+  <a class="sub" href="#s5-2">RTK 引脚复用</a>
+  <a class="h2" href="#s6">6 · 安全写回机制</a>
+  <a class="h2" href="#s7">7 · 设置与模型接入</a>
+  <a class="h2" href="#s8">8 · 常见问题排查</a>
+  <a class="h2" href="#s9">9 · 附录</a>
+</nav>
+
+<main>
+
+<div class="hero">
+  <h1>GenBoardConfig 使用 SOP</h1>
+  <p>按 GPIO 分配 Excel 核对并修正板级配置文件（<code>.c</code> / <code>.h</code>）的 Windows 桌面工具 · 标准操作规程</p>
+  <div class="meta">
+    <span>文档版本 v1.0</span>
+    <span>适用软件 genboardconfig 0.1.0</span>
+    <span>运行平台 Windows 10 / 11</span>
+    <span>Python ≥ 3.10（实测 3.12.10）</span>
+    <span>支持系列 NTK / RTK</span>
+  </div>
+</div>
+
+<div class="toc-mini">
+  <a href="#s0">工具概览</a>
+  <a href="#s1">环境与启动</a>
+  <a href="#s2">界面分区</a>
+  <a href="#s3">操作流程</a>
+  <a href="#s4">状态判定</a>
+  <a href="#s5">NTK / RTK</a>
+  <a href="#s6">安全写回</a>
+  <a href="#s7">设置</a>
+  <a href="#s8">排查</a>
+  <a href="#s9">附录</a>
+</div>
+
+<section id="s0">
+  <h2><span class="no">0</span>工具与适用范围</h2>
+
+  <h3 id="s0-1">0.1 适用场景</h3>
+  <p>把硬件工程师提供的 <b>GPIO 分配 Excel（HSI 表）</b> 与固件里的 <b>板级配置文件</b> 自动比对，找出「Excel 期望」与「代码实际」不一致的地方，确认后再由确定性代码安全写回。</p>
+  <div class="kv">
+    <div><b>输入 A</b><span>GPIO 分配表 Excel（<code>*.xlsx</code> / <code>*.XLSX</code>）</span></div>
+    <div><b>输入 B</b><span>板级配置源文件（<code>*.c</code> / <code>*.h</code>）</span></div>
+    <div><b>输出</b><span>差异预览 + 受控写回 + HTML/CSV 核对报告</span></div>
+    <div><b>适用系列</b><span>NTK（Novatek 端口位表）/ RTK（Realtek 引脚复用）</span></div>
+  </div>
+
+  <div class="note tip">
+    <b>核心原则</b>
+    判定由确定性规则优先完成，大模型只处理「规则判不清的残余项」，并且<b>只输出结构化结论</b>；<b>文件写回全部由确定性代码执行</b>，模型无权直接改文件。
+  </div>
+
+  <h3 id="s0-2">0.2 工作原理（图示）</h3>
+  <div class="svg-scroll">
+  <svg viewBox="0 0 1040 300" xmlns="http://www.w3.org/2000/svg" font-family="'Microsoft YaHei','Segoe UI',sans-serif">
+    <defs>
+      <marker id="ar" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+        <path d="M0,0 L10,4 L0,8 z" fill="#94a3b8"/>
+      </marker>
+      <marker id="ar2" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+        <path d="M0,0 L10,4 L0,8 z" fill="#7c3aed"/>
+      </marker>
+    </defs>
+
+    <rect x="10" y="26" width="182" height="96" rx="10" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.6"/>
+    <text x="101" y="52" text-anchor="middle" font-size="14" font-weight="700" fill="#075985">HSI Excel</text>
+    <text x="101" y="76" text-anchor="middle" font-size="12" fill="#0c4a6e">只取命中行过滤的行</text>
+    <text x="101" y="96" text-anchor="middle" font-size="12" fill="#0c4a6e">G / H / I 列语义</text>
+
+    <rect x="10" y="176" width="182" height="96" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.6"/>
+    <text x="101" y="202" text-anchor="middle" font-size="14" font-weight="700" fill="#14532d">BoardCfg.h / .c</text>
+    <text x="101" y="226" text-anchor="middle" font-size="12" fill="#14532d">宏组 / 端口位表 / 注释</text>
+    <text x="101" y="246" text-anchor="middle" font-size="12" fill="#14532d">条件编译上下文</text>
+
+    <rect x="236" y="26" width="186" height="96" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.6"/>
+    <text x="329" y="52" text-anchor="middle" font-size="14" font-weight="700">档案解析</text>
+    <text x="329" y="76" text-anchor="middle" font-size="12" fill="#64748b">表头探测 · 列语义</text>
+    <text x="329" y="96" text-anchor="middle" font-size="12" fill="#64748b">逐属性展开</text>
+
+    <rect x="236" y="176" width="186" height="96" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.6"/>
+    <text x="329" y="202" text-anchor="middle" font-size="14" font-weight="700">C 侧解析</text>
+    <text x="329" y="226" text-anchor="middle" font-size="12" fill="#64748b">BitsToByte 逐位展开</text>
+    <text x="329" y="246" text-anchor="middle" font-size="12" fill="#64748b">精确落点（行/列/长度）</text>
+
+    <line x1="192" y1="74" x2="230" y2="74" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar)"/>
+    <line x1="192" y1="224" x2="230" y2="224" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar)"/>
+
+    <rect x="452" y="26" width="214" height="246" rx="10" fill="#f8fafc" stroke="#2563eb" stroke-width="2"/>
+    <text x="559" y="54" text-anchor="middle" font-size="15" font-weight="700" fill="#1d4ed8">逐位比对</text>
+    <g font-size="12" fill="#334155">
+      <text x="466" y="88">NTK：DIR / PP / OUT</text>
+      <text x="466" y="112">RTK：电气类型 / 输出类型</text>
+      <text x="466" y="136">期望值 ← value_map 归一化</text>
+      <text x="466" y="160">实际值 ← 位表 / 复用区块</text>
+      <text x="466" y="182" fill="#64748b">（PU 暂时忽略）</text>
+    </g>
+    <rect x="466" y="196" width="186" height="30" rx="7" fill="#fff" stroke="#cbd5e1"/>
+    <text x="559" y="216" text-anchor="middle" font-size="12" fill="#64748b">冲突守卫 conflict_guard</text>
+    <rect x="466" y="236" width="186" height="28" rx="7" fill="#fff" stroke="#cbd5e1"/>
+    <text x="559" y="255" text-anchor="middle" font-size="12" fill="#64748b">NA 占位值 → 不判定</text>
+
+    <line x1="422" y1="74" x2="446" y2="74" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar)"/>
+    <line x1="422" y1="224" x2="446" y2="224" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#ar)"/>
+
+    <rect x="700" y="46" width="160" height="86" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="6 4"/>
+    <text x="780" y="74" text-anchor="middle" font-size="14" font-weight="700" fill="#5b21b6">云端 LLM 复核</text>
+    <text x="780" y="98" text-anchor="middle" font-size="12" fill="#6d28d9">仅残余歧义项</text>
+    <text x="780" y="118" text-anchor="middle" font-size="12" fill="#6d28d9">带证据 · 置信度闸门</text>
+
+    <path d="M666,120 L694,120 L694,89 L700,89" fill="none" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#ar2)"/>
+
+    <rect x="700" y="176" width="160" height="96" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.8"/>
+    <text x="780" y="202" text-anchor="middle" font-size="14" font-weight="700" fill="#991b1b">受控写回</text>
+    <g font-size="11.5" fill="#7f1d1d">
+      <text x="712" y="226">白名单编辑 · 备份</text>
+      <text x="712" y="246">结构校验 + 逐属性复检</text>
+      <text x="712" y="264">失败自动回滚</text>
+    </g>
+
+    <path d="M666,180 L694,180 L694,224 L700,224" fill="none" stroke="#dc2626" stroke-width="1.8" marker-end="url(#ar)"/>
+    <path d="M780,132 L780,176" fill="none" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#ar2)"/>
+    <text x="789" y="160" font-size="11.5" fill="#6d28d9">人工确认</text>
+
+    <text x="330" y="290" text-anchor="middle" font-size="12" fill="#64748b">确定性优先 · 证据强制 · 置信度闸门 · 安全写回（四层保障）</text>
+  </svg>
+  </div>
+  <figcaption><b>图 0-1　</b>核对链路：Excel 与 C 侧解析结果先做确定性逐位比对；判不清的残余项才送云端模型复核；最终写回由确定性代码执行并强制复检。</figcaption>
+</section>
+
+<section id="s1">
+  <h2><span class="no">1</span>环境准备与启动</h2>
+
+  <h3 id="s1-1">1.1 方式 A：一键脚本（推荐）</h3>
+  <p>在项目根目录双击 <code>run_gui.bat</code>。脚本会自动创建 <code>.venv</code>、安装依赖并启动 GUI，<b>不依赖 <code>activate</code></b>，因此不受 PowerShell 执行策略限制。</p>
+<pre><code><span class="c">:: run_gui.bat 内部流程</span>
+[1/3] 创建虚拟环境 .venv
+[2/3] pip install -r requirements.txt
+[3/3] PYTHONPATH=src → python -m genboardconfig</code></pre>
+
+  <h3 id="s1-2">1.2 方式 B：直接调用虚拟环境里的 Python</h3>
+<pre><code><span class="c"># 首次安装</span>
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -e ".[dev]"   <span class="c"># 可选：提供 genboardconfig 命令与 pytest</span>
+
+<span class="c"># 启动 GUI</span>
+$env:PYTHONPATH="src"
+.venv\Scripts\python.exe -m genboardconfig
+
+<span class="c"># 或者（已执行 pip install -e . 后）</span>
+.venv\Scripts\genboardconfig.exe</code></pre>
+
+  <h4>使用清华镜像加速下载</h4>
+  <p>在虚拟环境根目录放置 <code>.venv\pip.ini</code>，之后<b>所有</b> pip 操作（含 <code>run_gui.bat</code> 内部的安装）自动走清华源：</p>
+<pre><code>[global]
+index-url = https://pypi.tuna.tsinghua.edu.cn/simple
+trusted-host = pypi.tuna.tsinghua.edu.cn
+timeout = 120
+retries = 5</code></pre>
+  <div class="note warn">
+    <b>说明</b>
+    清华源未镜像 CPython Windows 安装包，故 Python 解释器本身需另行安装（3.10+）；<b>PyPI 依赖包全部由清华源下载</b>，实测速率 10~40 MB/s。
+  </div>
+
+  <h3 id="s1-3">1.3 安装自检</h3>
+<pre><code>.venv\Scripts\python.exe -m pytest tests -q
+<span class="c"># 期望输出：51 passed</span>
+
+.venv\Scripts\python.exe tools\smoke_real.py
+<span class="c"># 期望输出：真实样例端到端（在副本上做写回，不动原文件）</span></code></pre>
+
+  <h4>目录结构速查</h4>
+  <div class="tree">
+GenBoardConfig/
+├─ <span class="hl">run_gui.bat</span>              ← 一键启动入口
+├─ requirements.txt / pyproject.toml
+├─ config/
+│   ├─ settings.yaml            <span class="c">← 模型 / 批量 / 阈值 / 项目系列</span>
+│   ├─ settings.local.yaml      <span class="c">← 设置页保存（自动 gitignore）</span>
+│   ├─ secrets.bin              <span class="c">← API Key（Windows DPAPI 加密）</span>
+│   ├─ column_mapping.yaml / aliases.yaml
+│   └─ profiles/
+│       ├─ ntk.yaml             <span class="c">NTK 档案：端口位表口径</span>
+│       └─ rtk.yaml             <span class="c">RTK 档案：引脚复用表口径</span>
+├─ samples/
+│   ├─ NTK/  (…HSI….xlsx  +  BoardCfg.h)
+│   └─ RTK/  (…HSI….XLSX  +  …PINSHARE.h)
+├─ src/genboardconfig/          <span class="c">← 源码</span>
+├─ tools/                       <span class="c">← 冒烟 / 截图 / 探查脚本</span>
+└─ <span class="hl">.genboard/</span>                <span class="c">← 运行时自动生成（备份 / 日志）</span>
+  </div>
+</section>
+<section id="s2">
+  <h2><span class="no">2</span>界面分区总览</h2>
+  <p>主窗口为三栏布局：<b>左侧「核对概览」</b>、<b>中部四个标签页</b>、<b>右侧「条目详情」</b>，顶部为工具条、底部为状态栏。</p>
+
+  <div class="svg-scroll">
+  <svg viewBox="0 0 1040 660" xmlns="http://www.w3.org/2000/svg" font-family="'Microsoft YaHei','Segoe UI',sans-serif">
+    <rect x="1" y="1" width="1038" height="658" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+    <path d="M11,1 H1029 A10,10 0 0 1 1039,11 V38 H1 V11 A10,10 0 0 1 11,1 Z" fill="#1e293b"/>
+    <text x="16" y="25" font-size="12.5" fill="#e2e8f0">GenBoardConfig · GPIO 配置核对工具</text>
+    <circle cx="1008" cy="19" r="5" fill="#475569"/><circle cx="1023" cy="19" r="5" fill="#475569"/>
+    <rect x="1" y="38" width="1038" height="24" fill="#f1f5f9" stroke="#e2e8f0"/>
+    <text x="16" y="55" font-size="12" fill="#334155">文件</text>
+    <rect x="1" y="62" width="1038" height="46" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="44" y="90" font-size="12" fill="#334155">GPIO 表</text>
+    <rect x="86" y="73" width="148" height="24" rx="5" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="92" y="89" font-size="11" fill="#94a3b8">…HSI….xlsx</text>
+    <rect x="242" y="73" width="46" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <text x="265" y="89" text-anchor="middle" font-size="11" fill="#334155">浏览…</text>
+    <text x="300" y="90" font-size="12" fill="#334155">板级配置</text>
+    <rect x="360" y="73" width="176" height="24" rx="5" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="366" y="89" font-size="11" fill="#94a3b8">…BoardCfg.h</text>
+    <rect x="544" y="73" width="46" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <text x="567" y="89" text-anchor="middle" font-size="11" fill="#334155">浏览…</text>
+    <rect x="614" y="71" width="68" height="28" rx="6" fill="#2563eb"/>
+    <text x="648" y="89" text-anchor="middle" font-size="11.5" fill="#ffffff" font-weight="600">开始核对</text>
+    <rect x="690" y="73" width="44" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <text x="712" y="89" text-anchor="middle" font-size="11" fill="#94a3b8">停止</text>
+    <rect x="742" y="73" width="62" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <text x="773" y="89" text-anchor="middle" font-size="11" fill="#94a3b8">预览修改</text>
+    <rect x="812" y="73" width="62" height="24" rx="5" fill="#fee2e2" stroke="#ef4444"/>
+    <text x="843" y="89" text-anchor="middle" font-size="11" fill="#b91c1c" font-weight="600">应用修改</text>
+    <rect x="882" y="73" width="62" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <text x="913" y="89" text-anchor="middle" font-size="11" fill="#334155">导出报告</text>
+    <rect x="952" y="73" width="50" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <text x="977" y="89" text-anchor="middle" font-size="11" fill="#334155">设置</text>
+
+    <rect x="1" y="108" width="236" height="520" fill="#f8fafc" stroke="#e2e8f0"/>
+    <rect x="1" y="108" width="236" height="26" fill="#e2e8f0"/>
+    <text x="12" y="126" font-size="12" font-weight="700" fill="#334155">核对概览</text>
+    <g font-size="11" font-weight="600">
+      <rect x="10" y="142" width="66" height="38" rx="7" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.4"/>
+      <text x="43" y="158" text-anchor="middle" fill="#15803d">一致</text><text x="43" y="173" text-anchor="middle" fill="#16a34a" font-size="12.5">8</text>
+      <rect x="82" y="142" width="66" height="38" rx="7" fill="#fef2f2" stroke="#dc2626" stroke-width="1.6"/>
+      <text x="115" y="158" text-anchor="middle" fill="#b91c1c">不一致</text><text x="115" y="173" text-anchor="middle" fill="#dc2626" font-size="12.5">6</text>
+      <rect x="154" y="142" width="66" height="38" rx="7" fill="#fff7ed" stroke="#ea580c" stroke-width="1.4"/>
+      <text x="187" y="158" text-anchor="middle" fill="#c2410c">缺失</text><text x="187" y="173" text-anchor="middle" fill="#ea580c" font-size="12.5">0</text>
+      <rect x="10" y="186" width="66" height="38" rx="7" fill="#fefce8" stroke="#ca8a04" stroke-width="1.4"/>
+      <text x="43" y="202" text-anchor="middle" fill="#a16207">歧义</text><text x="43" y="217" text-anchor="middle" fill="#ca8a04" font-size="12.5">0</text>
+      <rect x="82" y="186" width="66" height="38" rx="7" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.4"/>
+      <text x="115" y="202" text-anchor="middle" fill="#475569">不适用</text><text x="115" y="217" text-anchor="middle" fill="#64748b" font-size="12.5">0</text>
+      <rect x="154" y="186" width="66" height="38" rx="7" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.4"/>
+      <text x="187" y="202" text-anchor="middle" fill="#6d28d9">未解析</text><text x="187" y="217" text-anchor="middle" fill="#7c3aed" font-size="12.5">0</text>
+    </g>
+    <g font-size="11" fill="#334155">
+      <text x="12" y="248" font-weight="700">总条目</text><text x="80" y="248">14</text>
+      <text x="12" y="268">Excel 行数</text><text x="80" y="268">14</text>
+      <text x="12" y="288">C 条目数</text><text x="80" y="288">1368</text>
+      <text x="12" y="308">模型调用</text><text x="80" y="308">0 次 / 0 tokens</text>
+      <text x="12" y="328" font-weight="700">核对档案</text>
+      <text x="12" y="344" fill="#475569">NTK 系列（端口位表核对）</text>
+      <text x="12" y="364" font-weight="700">行过滤</text>
+      <text x="12" y="380" fill="#475569">gpio_type ∈ ['IN','OUT']</text>
+      <text x="12" y="396" fill="#475569">参与 14 行 / 跳过 0 行</text>
+      <text x="12" y="416" font-weight="700">文件指纹</text>
+      <text x="12" y="432" fill="#475569">ecca5f1d61b5708f</text>
+    </g>
+    <rect x="10" y="446" width="216" height="96" rx="7" fill="#fffbeb" stroke="#fcd34d"/>
+    <text x="20" y="466" font-size="11.5" font-weight="700" fill="#78350f">提示 / 警告</text>
+    <text x="20" y="492" font-size="11.5" fill="#92400e">无</text>
+
+    <rect x="237" y="108" width="570" height="520" fill="#ffffff" stroke="#e2e8f0"/>
+    <rect x="237" y="108" width="570" height="28" fill="#f1f5f9"/>
+    <rect x="241" y="110" width="66" height="26" rx="5" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="274" y="127" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1d4ed8">核对明细</text>
+    <text x="344" y="127" text-anchor="middle" font-size="11.5" fill="#64748b">差异预览</text>
+    <text x="408" y="127" text-anchor="middle" font-size="11.5" fill="#64748b">并排对比</text>
+    <text x="472" y="127" text-anchor="middle" font-size="11.5" fill="#64748b">运行日志</text>
+    <rect x="237" y="136" width="570" height="30" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="247" y="155" font-size="11" fill="#64748b">状态</text>
+    <rect x="272" y="141" width="76" height="21" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="310" y="156" text-anchor="middle" font-size="11" fill="#334155">全部</text>
+    <text x="360" y="155" font-size="11" fill="#64748b">搜索</text>
+    <rect x="384" y="141" width="248" height="21" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="392" y="156" font-size="11" fill="#94a3b8">管脚 / 功能 / 配置项 / 期望值 …</text>
+    <rect x="642" y="144" width="12" height="12" rx="2" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="660" y="155" font-size="11" fill="#64748b">仅显示可自动修改</text>
+    <rect x="760" y="140" width="46" height="22" rx="4" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="783" y="155" text-anchor="middle" font-size="10" fill="#475569">全选</text>
+    <rect x="237" y="166" width="570" height="26" fill="#f8fafc" stroke="#e2e8f0"/>
+    <g font-size="10.5" fill="#475569">
+      <text x="250" y="183">应用</text><text x="288" y="183">状态</text><text x="336" y="183">网络名</text>
+      <text x="424" y="183">引脚</text><text x="472" y="183">占用信号</text><text x="552" y="183">方向</text>
+      <text x="600" y="183">输出类型</text><text x="668" y="183">上电电平</text><text x="738" y="183">说明</text>
+    </g>
+    <g font-size="10.5">
+      <rect x="237" y="192" width="570" height="24" fill="#ffffff" stroke="#e2e8f0"/>
+      <text x="250" y="208" fill="#16a34a">☑</text><text x="288" y="208" fill="#16a34a">一致</text>
+      <text x="336" y="208" fill="#0f172a">+3V3C_EN</text><text x="424" y="208" fill="#0f172a">PA2</text>
+      <text x="472" y="208" fill="#64748b">PWM_OS1_OFF…</text><text x="552" y="208" fill="#15803d">OUT</text>
+      <text x="600" y="208" fill="#15803d">LOW</text><text x="668" y="208" fill="#15803d">LOW</text>
+      <text x="738" y="208" fill="#64748b">引脚 PA2（A…</text>
+
+      <rect x="237" y="216" width="570" height="24" fill="#fcfdfe" stroke="#e2e8f0"/>
+      <text x="250" y="232" fill="#16a34a">☑</text><text x="288" y="232" fill="#16a34a">一致</text>
+      <text x="336" y="232" fill="#0f172a">DP_HPD</text><text x="424" y="232" fill="#0f172a">PB6</text>
+      <text x="472" y="232" fill="#64748b">DIG1_HPD</text><text x="552" y="232" fill="#15803d">OUT</text>
+      <text x="600" y="232" fill="#15803d">HIGH</text><text x="668" y="232" fill="#15803d">LOW</text>
+      <text x="738" y="232" fill="#64748b">引脚 PB6（B…</text>
+
+      <rect x="237" y="240" width="570" height="24" fill="#dbeafe" stroke="#e2e8f0"/>
+      <text x="250" y="256" fill="#16a34a">☑</text><text x="288" y="256" fill="#dc2626" font-weight="700">不一致</text>
+      <text x="336" y="256" fill="#0f172a">ON_BACKLIGHT</text><text x="424" y="256" fill="#0f172a">PC1</text>
+      <text x="472" y="256" fill="#64748b">BACKLIGHT</text><text x="552" y="256" fill="#15803d">OUT</text>
+      <text x="600" y="256" fill="#15803d">HIGH</text><text x="668" y="256" fill="#dc2626" font-weight="700">HIGH</text>
+      <text x="738" y="256" fill="#64748b">引脚 PC1（C…</text>
+
+      <rect x="237" y="264" width="570" height="24" fill="#fcfdfe" stroke="#e2e8f0"/>
+      <text x="250" y="280" fill="#16a34a">☑</text><text x="288" y="280" fill="#dc2626" font-weight="700">不一致</text>
+      <text x="336" y="280" fill="#0f172a">Panel_On</text><text x="424" y="280" fill="#0f172a">PC2</text>
+      <text x="472" y="280" fill="#64748b">PANEL_POWER…</text><text x="552" y="280" fill="#15803d">OUT</text>
+      <text x="600" y="280" fill="#15803d">HIGH</text><text x="668" y="280" fill="#dc2626" font-weight="700">HIGH</text>
+      <text x="738" y="280" fill="#64748b">引脚 PC2（C…</text>
+    </g>
+
+    <rect x="807" y="108" width="232" height="520" fill="#f8fafc" stroke="#e2e8f0"/>
+    <rect x="807" y="108" width="232" height="26" fill="#e2e8f0"/>
+    <text x="818" y="126" font-size="12" font-weight="700" fill="#334155">条目详情</text>
+    <rect x="816" y="142" width="214" height="330" rx="6" fill="#ffffff" stroke="#e2e8f0"/>
+    <g font-size="10.5" fill="#0f172a">
+      <text x="824" y="160" font-weight="700">Excel</text><text x="864" y="160" fill="#475569">HSI 第 8 行</text>
+      <text x="824" y="177">网络名：</text><text x="874" y="177" font-family="Consolas,monospace">ON_BACKLIGHT</text>
+      <text x="824" y="194">引脚：</text><text x="874" y="194" font-family="Consolas,monospace">PC1</text>
+      <text x="824" y="211">状态：</text><text x="874" y="211" fill="#dc2626" font-weight="700">不一致</text>
+      <text x="824" y="228" fill="#475569">来源：规则 · 置信度 0.95</text>
+      <text x="824" y="250" font-weight="700">逐属性核对</text>
+    </g>
+    <rect x="824" y="258" width="198" height="16" fill="#e2e8f0"/>
+    <g font-size="9" fill="#334155">
+      <text x="826" y="269">属性</text><text x="864" y="269">期望</text><text x="906" y="269">实际</text>
+      <text x="948" y="269">结论</text><text x="990" y="269">来源</text>
+    </g>
+    <g font-size="8.5">
+      <text x="826" y="288">方向</text><text x="864" y="288" fill="#16a34a">OUT</text><text x="906" y="288" fill="#16a34a">OUT</text>
+      <text x="948" y="288" fill="#16a34a">match</text><text x="990" y="288" fill="#64748b">规则</text>
+      <text x="826" y="308">输出类型</text><text x="864" y="308" fill="#16a34a">Push pull</text><text x="906" y="308" fill="#16a34a">HIGH</text>
+      <text x="948" y="308" fill="#16a34a">match</text><text x="990" y="308" fill="#64748b">规则</text>
+      <text x="826" y="328">上电电平</text><text x="864" y="328">High</text><text x="906" y="328" fill="#dc2626">LOW</text>
+      <text x="948" y="328" fill="#dc2626">mismatch</text><text x="990" y="328" fill="#64748b">规则</text>
+    </g>
+    <text x="824" y="356" font-size="10.5" font-weight="700" fill="#0f172a">建议修改</text>
+    <text x="824" y="372" font-size="9.5" fill="#475569">PORT_C_DEFAULT_OUT[1] L26</text>
+    <text x="824" y="388" font-size="9.5" fill="#475569">期望 High，实际 LOW</text>
+    <text x="816" y="492" font-size="11" font-weight="700" fill="#334155">人工改判（优先于模型结论）</text>
+    <g font-size="10" fill="#334155">
+      <rect x="816" y="502" width="48" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="840" y="518" text-anchor="middle">一致</text>
+      <rect x="870" y="502" width="56" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="898" y="518" text-anchor="middle">不一致</text>
+      <rect x="932" y="502" width="48" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="956" y="518" text-anchor="middle">歧义</text>
+      <rect x="986" y="502" width="48" height="24" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="1010" y="518" text-anchor="middle">不适用</text>
+    </g>
+    <rect x="816" y="534" width="216" height="52" rx="6" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="824" y="562" font-size="10.5" fill="#94a3b8">人工备注（可选）</text>
+
+    <rect x="1" y="628" width="1038" height="30" fill="#f1f5f9" stroke="#e2e8f0"/>
+    <text x="12" y="647" font-size="11" fill="#334155">核对完成</text>
+    <rect x="950" y="636" width="78" height="14" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+    <rect x="951" y="637" width="14" height="12" rx="6" fill="#e2e8f0"/>
+    <text x="994" y="647" font-size="10" fill="#64748b">0%</text>
+
+    <g>
+      <circle cx="24" cy="85" r="15" fill="#2563eb" stroke="#fff" stroke-width="3"/>
+      <text x="24" y="90" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">1</text>
+      <circle cx="232" cy="125" r="15" fill="#2563eb" stroke="#fff" stroke-width="3"/>
+      <text x="232" y="130" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">2</text>
+      <circle cx="252" cy="151" r="15" fill="#2563eb" stroke="#fff" stroke-width="3"/>
+      <text x="252" y="156" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">3</text>
+      <circle cx="533" cy="182" r="15" fill="#2563eb" stroke="#fff" stroke-width="3"/>
+      <text x="533" y="187" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">4</text>
+      <circle cx="795" cy="125" r="15" fill="#2563eb" stroke="#fff" stroke-width="3"/>
+      <text x="795" y="130" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">5</text>
+      <circle cx="40" cy="643" r="15" fill="#2563eb" stroke="#fff" stroke-width="3"/>
+      <text x="40" y="648" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">6</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption><b>图 2-1　</b>界面分区示意（示意数据）：① 顶部工具条　② 左侧「核对概览」　③ 过滤工具条　④ 中部核对明细表　⑤ 右侧「条目详情」　⑥ 底部状态栏与进度条。</figcaption>
+
+  <div class="anno">
+    <img src="sop/01_main_detail.png" alt="主界面截图">
+    <span class="pin" style="left:36.5%;top:5.2%">1</span>
+    <span class="pin" style="left:59.8%;top:5.4%">2</span>
+    <span class="pin" style="left:3.0%;top:12.5%">3</span>
+    <span class="pin" style="left:35.0%;top:15.5%">4</span>
+    <span class="pin" style="left:48.0%;top:15.5%">5</span>
+    <span class="pin" style="left:94.2%;top:19.5%">6</span>
+    <span class="pin" style="left:35.0%;top:43.0%">7</span>
+  </div>
+  <figcaption><b>图 2-2　</b>主界面实拍（NTK 样例，14 行参与核对 / 8 一致 / 6 不一致）：① 工具条　②「开始核对」　③ 核对概览与状态卡　④ 核对明细页签　⑤ 过滤工具条　⑥ 条目详情　⑦ 逐属性核对表。</figcaption>
+
+  <h3>2.1 分区速查表</h3>
+  <table class="tight">
+    <thead><tr><th style="width:120px">区域</th><th style="width:180px">控件</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="7"><b>顶部工具条</b></td><td>GPIO 表 / 板级配置</td><td>两个只读路径框 +「浏览…」；<b>两个都选好</b>后「开始核对」才可点</td></tr>
+      <tr><td>开始核对</td><td>主按钮（<code>Ctrl+R</code>）；执行期间禁用，右侧「停止」可用</td></tr>
+      <tr><td>停止</td><td>中断正在进行的核对</td></tr>
+      <tr><td>预览修改</td><td>按已勾选行生成 unified diff，自动跳到「差异预览」页签</td></tr>
+      <tr><td>应用修改</td><td>红色危险按钮；先备份再写回，失败自动回滚</td></tr>
+      <tr><td>导出报告</td><td>（<code>Ctrl+E</code>）导出 HTML 报告 + 同名 CSV</td></tr>
+      <tr><td>设置</td><td>（<code>Ctrl+,</code>）项目系列 / 行过滤 / 大模型 / 核对策略</td></tr>
+
+      <tr><td rowspan="4"><b>核对概览</b><br>（左）</td><td>6 张状态卡</td><td>一致 / 不一致 / 缺失 / 歧义 / 不适用 / 未解析；<b>点击即筛选</b>，再点取消</td></tr>
+      <tr><td>统计信息</td><td>总条目、Excel 行数、C 条目数、模型调用（次数 / tokens / 失败数）</td></tr>
+      <tr><td>核对档案 / 行过滤</td><td>显示命中的档案、<b>实际使用的过滤列与取值</b>、参与/跳过行数</td></tr>
+      <tr><td>文件指纹 / 提示警告</td><td>板级配置文件的 SHA 前 16 位；黄色区显示回退提示与模型错误</td></tr>
+
+      <tr><td rowspan="4"><b>中部页签</b></td><td>核对明细</td><td>主表：应用 | 状态 | 网络名 | 引脚 | 占用信号 | 方向 | 输出类型 | 上电电平 | 说明<br><b>选中行用蓝色粗边框标示，不会盖住状态列的红/绿底色</b></td></tr>
+      <tr><td>差异预览</td><td>彩色 unified diff；支持「复制 Diff」「导出 patch」</td></tr>
+      <tr><td>并排对比</td><td>左 Excel ↔ 右板级配置，双向联动；<b>切到本页签自动隐藏左右侧栏</b></td></tr>
+      <tr><td>运行日志</td><td>全过程日志 + 模型交互记录（请求 / 响应 / 错误）</td></tr>
+
+      <tr><td rowspan="2"><b>条目详情</b><br>（右）</td><td>详情区</td><td>Excel 行号、网络名、引脚、状态与来源、逐属性核对表、定义原文、建议修改</td></tr>
+      <tr><td>人工改判</td><td>「一致 / 不一致 / 歧义 / 不适用」四个按钮 + 备注框，<b>优先级高于模型结论</b>；也可右键表格改判</td></tr>
+
+      <tr><td><b>状态栏</b></td><td>进度条</td><td>实时阶段提示与百分比；核对中显示当前阶段</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 快捷键</h3>
+  <table class="tight">
+    <thead><tr><th style="width:160px">快捷键</th><th>功能</th></tr></thead>
+    <tbody>
+      <tr><td><code>Ctrl + R</code></td><td>开始核对</td></tr>
+      <tr><td><code>Ctrl + E</code></td><td>导出核对报告</td></tr>
+      <tr><td><code>Ctrl + ,</code></td><td>打开设置对话框</td></tr>
+      <tr><td>表格右键</td><td>标记为一致 / 不一致 / 歧义 / 不适用、复制当前行</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="s3">
+  <h2><span class="no">3</span>标准操作流程</h2>
+
+  <div class="svg-scroll">
+  <svg viewBox="0 0 1040 220" xmlns="http://www.w3.org/2000/svg" font-family="'Microsoft YaHei','Segoe UI',sans-serif">
+    <defs>
+      <marker id="fa" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+        <path d="M0,0 L10,4 L0,8 z" fill="#2563eb"/>
+      </marker>
+    </defs>
+    <g font-size="12.5" text-anchor="middle">
+      <rect x="8"   y="70" width="128" height="60" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.8"/>
+      <text x="72"  y="95" font-weight="700" fill="#1d4ed8">① 选文件</text>
+      <text x="72"  y="114" font-size="11" fill="#475569">Excel + 板级配置</text>
+
+      <rect x="162" y="70" width="128" height="60" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.8"/>
+      <text x="226" y="95" font-weight="700" fill="#1d4ed8">② 开始核对</text>
+      <text x="226" y="114" font-size="11" fill="#475569">自动识别档案</text>
+
+      <rect x="316" y="70" width="128" height="60" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.8"/>
+      <text x="380" y="95" font-weight="700" fill="#1d4ed8">③ 审阅结果</text>
+      <text x="380" y="114" font-size="11" fill="#475569">明细 / 并排 / 详情</text>
+
+      <rect x="470" y="70" width="128" height="60" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.8"/>
+      <text x="534" y="95" font-weight="700" fill="#1d4ed8">④ 勾选</text>
+      <text x="534" y="114" font-size="11" fill="#475569">全选可修改</text>
+
+      <rect x="624" y="70" width="128" height="60" rx="9" fill="#fff7ed" stroke="#ea580c" stroke-width="1.8"/>
+      <text x="688" y="95" font-weight="700" fill="#c2410c">⑤ 预览修改</text>
+      <text x="688" y="114" font-size="11" fill="#475569">看 diff，人工确认</text>
+
+      <rect x="778" y="70" width="128" height="60" rx="9" fill="#fef2f2" stroke="#dc2626" stroke-width="1.8"/>
+      <text x="842" y="95" font-weight="700" fill="#991b1b">⑥ 应用修改</text>
+      <text x="842" y="114" font-size="11" fill="#475569">备份→写回→复检</text>
+
+      <rect x="932" y="70" width="100" height="60" rx="9" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
+      <text x="982" y="95" font-weight="700" fill="#14532d">⑦ 导出报告</text>
+      <text x="982" y="114" font-size="11" fill="#475569">HTML + CSV</text>
+    </g>
+    <g stroke="#2563eb" stroke-width="2" marker-end="url(#fa)">
+      <line x1="136" y1="100" x2="158" y2="100"/>
+      <line x1="290" y1="100" x2="312" y2="100"/>
+      <line x1="444" y1="100" x2="466" y2="100"/>
+      <line x1="598" y1="100" x2="620" y2="100"/>
+      <line x1="752" y1="100" x2="774" y2="100"/>
+      <line x1="906" y1="100" x2="928" y2="100"/>
+    </g>
+    <path d="M982,130 L982,178 L72,178 L72,134" fill="none" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#fa)"/>
+    <text x="527" y="196" text-anchor="middle" font-size="11.5" fill="#64748b">如需重新核对：修改后可回到 ① 或直接点「开始核对」</text>
+  </svg>
+  </div>
+  <figcaption><b>图 3-1　</b>标准流程七步：文件准备 → 核对 → 审阅 → 勾选 → 预览 → 写回 → 报告。第 ⑤⑥ 步是<b>唯一会改动源文件</b>的环节，务必先看 diff。</figcaption>
+
+  <div class="step" id="s3-1">
+    <div class="hd"><span class="n">1</span><h3>选择文件</h3></div>
+    <ol>
+      <li><b>GPIO 表</b>：点「浏览…」选择 GPIO 分配 Excel（<code>*.xlsx</code> / <code>*.XLSX</code>）。工具会自动定位 <code>HSI</code> 工作表并探测表头。</li>
+      <li><b>板级配置</b>：点「浏览…」选择板级配置文件（<code>*.c</code> 或 <code>*.h</code>），通常是 <code>BoardCfg.h</code>（NTK）或 <code>*PINSHARE.h</code>（RTK）。</li>
+      <li>选择完成后<b>立即自动识别核对档案</b>：按「设置 → 项目系列」或板级配置文件的特征（<code>detect_series</code>）判定为 NTK / RTK，并写入左下角「核对档案」。</li>
+    </ol>
+    <div class="note tip">
+      <b>可选：先设置行过滤</b>
+      若目标表未填写 <code>GPIO TYPE</code> 列，可在「设置 → 行过滤」把<b>过滤列</b>改为 <code>chip_section</code>、<b>取值</b>填 <code>OUTPUT, INPUT</code>。工具也内置了<b>自动回退</b>：主列无匹配行时自动改用备用列，并在左下角标注「（回退）」。
+    </div>
+  </div>
+
+  <div class="step" id="s3-2">
+    <div class="hd"><span class="n">2</span><h3>开始核对</h3></div>
+    <p>点顶部 <b>「开始核对」</b>（或 <code>Ctrl+R</code>）。核对在后台线程执行，界面不会卡死。</p>
+    <ul>
+      <li>进度条显示当前阶段；核对期间「停止」可用。</li>
+      <li>「运行日志」页签会记录：<code>=== 开始核对 ===</code>、模型后端与是否启用大模型、逐条模型交互、最终统计。</li>
+      <li>若启用了大模型，左侧「模型调用」显示 <code>次数 / tokens / 失败数</code>；失败会在黄色警告区与日志中同时标红。</li>
+    </ul>
+    <div class="note warn">
+      <b>首次核对建议先关闭大模型</b>
+      在「设置 → 核对策略」取消勾选「启用大模型核对」，用纯规则跑一遍，确认档案与过滤列正确后再接入模型，可避免把时间浪费在无关条目上。
+    </div>
+  </div>
+
+  <div class="step" id="s3-3">
+    <div class="hd"><span class="n">3</span><h3>审阅结果</h3></div>
+    <p>核对完成后从三个角度审阅：</p>
+    <ol>
+      <li><b>概览</b>（左）：点状态卡筛出「不一致」「歧义」等；确认「行过滤」显示的是你期望的列与取值。</li>
+      <li><b>明细</b>（中）：属性列显示 <code>期望 → 实际</code>，不一致的期望值标红。</li>
+      <li><b>详情</b>（右）：选中任一行，查看<b>逐属性核对表</b>（属性 / 期望 / 实际 / 结论 / 来源）与<b>定义原文</b>（宏名 + 行号 + 原文片段）。</li>
+    </ol>
+    <p><b>并排对比页签</b>适合逐引脚确认：左表是 Excel 数据，右表是板级配置条目，两边按 Excel 行分组一一对应，选中一侧另一侧自动联动滚动。</p>
+
+    <div class="note tip">
+      <b>选中行的标示方式</b>
+      选中行<b>不会变成蓝底</b>，而是用一圈<b>蓝色粗边框</b>圈出来 —— 这样状态列的红（不一致）/绿（一致）/黄（歧义）底色与文字始终保持原样，方便连续判读整列颜色。并排对比页签左右两张表同理。
+    </div>
+
+    <figure>
+      <div class="anno">
+        <img src="sop/03_compare_view.png" alt="并排对比视图">
+        <span class="pin" style="left:50.5%;top:8.5%">1</span>
+        <span class="pin" style="left:13.0%;top:18.0%">2</span>
+        <span class="pin" style="left:13.0%;top:47.0%">3</span>
+        <span class="pin" style="left:67.0%;top:47.0%">4</span>
+        <span class="pin" style="left:31.0%;top:24.0%">5</span>
+      </div>
+      <figcaption><b>图 3-2　</b>并排对比视图（NTK 样例）：① 左侧范围下拉　② Excel 数据表（方向/输出类型/上电电平 按结论着色：绿=一致，红=不一致，灰=不参与核对）　③ 状态列　④ 右侧板级配置条目（期望值 / 实际值 / 判定）　⑤ 分组带。</figcaption>
+    </figure>
+
+    <figure>
+      <div class="anno">
+        <img src="sop/06_compare_view_rtk.png" alt="RTK 并排对比视图">
+        <span class="pin" style="left:13.0%;top:48.0%">1</span>
+        <span class="pin" style="left:67.0%;top:48.0%">2</span>
+      </div>
+      <figcaption><b>图 3-3　</b>RTK 并排对比：同一套界面下核对对象变为引脚复用。图中 <code>SBU2_1</code> / <code>SBU1_1</code> 两行判定为<b>需人工确认</b>（歧义），因 Excel 的功能名与 <code>.h</code> 中的复用功能名不一致，需交由大模型或人工判定等效性。</figcaption>
+    </figure>
+
+    <h4>人工改判</h4>
+    <p>对模型或规则给出的结论不认可时：选中行 → 在右侧点「一致 / 不一致 / 歧义 / 不适用」，或填备注。人工结论<b>优先级高于模型</b>，状态卡计数会即时重算。</p>
+    <div class="note danger">
+      <b>注意</b>
+      标记为「不一致」时，工具会基于该行的期望值生成一条建议修改（前提是能定位到板级配置里的落点）。标记前请确认期望值正确。
+    </div>
+  </div>
+
+  <div class="step" id="s3-4">
+    <div class="hd"><span class="n">4</span><h3>勾选要修改的行</h3></div>
+    <ul>
+      <li>在「核对明细」表最左侧的<b>「应用」列</b>勾选要处理的行。</li>
+      <li>点 <b>「全选可修改」</b> 可一次勾选全部可自动改写的行；<b>「清空选择」</b> 取消全部。</li>
+      <li>辅助筛选：状态下拉（按结论过滤）、搜索框（管脚 / 功能 / 配置项 / 期望值）、勾选<b>「仅显示可自动修改」</b>。</li>
+    </ul>
+  </div>
+
+  <div class="step" id="s3-5">
+    <div class="hd"><span class="n">5</span><h3>预览修改</h3></div>
+    <p>点 <b>「预览修改」</b>。界面自动切到「差异预览」页签，显示彩色 unified diff，顶部给出统计：</p>
+<pre><code>新增 3 行 / 删除 3 行 · 跳过 6 条</code></pre>
+    <ul>
+      <li><span style="color:#16a34a">绿色 <code>+</code></span> = 改写后的行，<span style="color:#dc2626">红色 <code>-</code></span> = 改写前的行。</li>
+      <li>「跳过 N 条」= 这些行<b>不能自动改</b>（无法唯一定位、落点冲突、期望值冲突等），需人工在 <code>.h</code> 里直接改；跳过原因会写进「运行日志」。</li>
+      <li>可「复制 Diff」到剪贴板，或「导出 patch」为 <code>*.patch</code> 文件供评审。</li>
+    </ul>
+    <figure>
+      <div class="anno">
+        <img src="sop/02_diff_preview.png" alt="差异预览">
+        <span class="pin" style="left:41.0%;top:23.5%">1</span>
+        <span class="pin" style="left:41.0%;top:36.5%">2</span>
+        <span class="pin" style="left:41.0%;top:52.0%">3</span>
+      </div>
+      <figcaption><b>图 3-4　</b>差异预览：① <code>PORT_C_DEFAULT_OUT</code> 的 bit1 由 <code>LOW</code> 改为 <code>HIGH</code>（对应 Excel PC1 行「Power On = High」）；② <code>PORT_E_DEFAULT_OUT</code>；③ <code>PORT_K_DEFAULT_OUT</code>。整行只替换 <code>BitsToByte(...)</code> 中的一个实参，<b>排版不变</b>。</figcaption>
+    </figure>
+  </div>
+
+  <div class="step" id="s3-6">
+    <div class="hd"><span class="n">6</span><h3>应用修改</h3></div>
+    <p>点 <b>「应用修改」</b>，弹出确认框显示目标文件路径与将写入的处数。确认后依次执行：</p>
+    <div class="svg-scroll">
+    <svg viewBox="0 0 1040 250" xmlns="http://www.w3.org/2000/svg" font-family="'Microsoft YaHei','Segoe UI',sans-serif">
+      <defs>
+        <marker id="sa" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 z" fill="#64748b"/>
+        </marker>
+        <marker id="sa2" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 z" fill="#dc2626"/>
+        </marker>
+      </defs>
+      <g font-size="12.5" text-anchor="middle">
+        <rect x="10" y="40" width="132" height="58" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.8"/>
+        <text x="76" y="65" font-weight="700">① 备份</text>
+        <text x="76" y="84" font-size="11" fill="#475569">.genboard/backup/</text>
+
+        <rect x="172" y="40" width="132" height="58" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.8"/>
+        <text x="238" y="65" font-weight="700">② 写回</text>
+        <text x="238" y="84" font-size="11" fill="#475569">仅白名单落点</text>
+
+        <rect x="334" y="40" width="132" height="58" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.8"/>
+        <text x="400" y="65" font-weight="700">③ 结构校验</text>
+        <text x="400" y="84" font-size="11" fill="#475569">宏 / 位表完整性</text>
+
+        <rect x="496" y="40" width="132" height="58" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.8"/>
+        <text x="562" y="65" font-weight="700">④ 语义复检</text>
+        <text x="562" y="84" font-size="11" fill="#475569">逐属性重新比对</text>
+
+        <rect x="670" y="40" width="132" height="58" rx="9" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
+        <text x="736" y="65" font-weight="700" fill="#14532d">⑤ 通过</text>
+        <text x="736" y="84" font-size="11" fill="#475569">已应用并复检</text>
+
+        <rect x="848" y="40" width="182" height="58" rx="9" fill="#fef2f2" stroke="#dc2626" stroke-width="1.8"/>
+        <text x="939" y="65" font-weight="700" fill="#991b1b">✗ 失败 → 自动回滚</text>
+        <text x="939" y="84" font-size="11" fill="#7f1d1d">从备份还原源文件</text>
+      </g>
+      <g stroke="#64748b" stroke-width="2" marker-end="url(#sa)">
+        <line x1="142" y1="69" x2="168" y2="69"/>
+        <line x1="304" y1="69" x2="330" y2="69"/>
+        <line x1="466" y1="69" x2="492" y2="69"/>
+        <line x1="628" y1="69" x2="666" y2="69"/>
+      </g>
+      <path d="M562,98 L562,150 L939,150 L939,104" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#sa2)"/>
+      <path d="M400,98 L400,150 L939,150" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="736" y="176" text-anchor="middle" font-size="12" fill="#64748b">复检结果同时写入「运行日志」：已修复 / 未消除 / 新增差异</text>
+      <text x="520" y="30" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">写回安全链（任一环节失败即回滚，源文件恢复到写回前状态）</text>
+    </svg>
+    </div>
+    <figcaption><b>图 3-5　</b>写回安全链：备份 → 白名单写回 → 结构校验 → 语义复检 → 通过；任一校验失败立即从备份回滚。</figcaption>
+  </div>
+
+  <div class="step">
+    <div class="hd"><span class="n">7</span><h3>导出报告</h3></div>
+    <p>点 <b>「导出报告」</b>（<code>Ctrl+E</code>）选择保存位置（默认 <code>&lt;板级配置目录&gt;\.genboard\report.html</code>）。工具会同时生成：</p>
+    <ul>
+      <li><code>report.html</code> —— 完整核对报告（含结论、证据、差异、统计），可直接在浏览器打开或作为附件归档。</li>
+      <li><code>report.csv</code> —— 同名表格，便于导入 Excel 继续分析。</li>
+    </ul>
+  </div>
+</section>
+<section id="s4">
+  <h2><span class="no">4</span>状态判定与图例</h2>
+
+  <h3>4.1 六种结论</h3>
+  <table class="tight">
+    <thead><tr><th style="width:110px">状态</th><th style="width:90px">内部值</th><th style="width:70px">颜色</th><th>含义与处理</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-ok">一致</span></td><td><code>match</code></td><td><i style="background:#16a34a"></i> 绿</td><td>Excel 期望与板级配置实际相同，无需处理</td></tr>
+      <tr><td><span class="badge b-bad">不一致</span></td><td><code>mismatch</code></td><td><i style="background:#dc2626"></i> 红</td><td>两者不同，<b>可勾选并写回</b>（唯一能定位落点时）</td></tr>
+      <tr><td><span class="badge b-org">缺失</span></td><td><code>missing</code></td><td><i style="background:#ea580c"></i> 橙</td><td>Excel 有该引脚，但板级配置里找不到对应定义</td></tr>
+      <tr><td><span class="badge b-warn">歧义</span></td><td><code>ambiguous</code></td><td><i style="background:#ca8a04"></i> 黄</td><td>判定不清，<b>需人工确认</b>；模型置信度低于阈值时也归此类</td></tr>
+      <tr><td><span class="badge b-na">不适用</span></td><td><code>not_applicable</code></td><td><i style="background:#64748b"></i> 灰</td><td>该行不参与核对（模板占位符、噪声项、Excel 标 NA 等）</td></tr>
+      <tr><td><span class="badge b-pur">未解析</span></td><td><code>unresolved</code></td><td><i style="background:#7c3aed"></i> 紫</td><td>解析阶段未能得出结论，需人工介入</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 判定来源</h3>
+  <p>每条结论都标注<b>来源</b>与<b>置信度</b>，在右侧详情面板可见：</p>
+  <table class="tight">
+    <thead><tr><th style="width:110px">来源</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-info">规则</span></td><td>确定性规则判定（<code>deterministic</code>）—— 引脚来自 Excel、位表就是位表，绝大多数结论属此类</td></tr>
+      <tr><td><span class="badge b-pur">模型</span></td><td>大模型复核（<code>llm</code>）—— 仅用于规则判不清的残余项，并附带理由与置信度</td></tr>
+      <tr><td><span class="badge b-ok">人工</span></td><td>人工改判（<code>human</code>）—— <b>优先级最高</b>，置信度记为 1.00</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.3 判定决策树</h3>
+  <div class="svg-scroll">
+  <svg viewBox="0 0 1040 360" xmlns="http://www.w3.org/2000/svg" font-family="'Microsoft YaHei','Segoe UI',sans-serif">
+    <defs>
+      <marker id="da" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <path d="M0,0 L9,3.5 L0,7 z" fill="#64748b"/>
+      </marker>
+    </defs>
+    <g font-size="12" text-anchor="middle">
+      <rect x="8" y="131" width="104" height="44" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.7"/>
+      <text x="60" y="150" font-weight="700">Excel 一行</text><text x="60" y="166" font-size="10.5" fill="#64748b">一个引脚</text>
+
+      <polygon points="180,116 268,153 180,190 92,153" fill="#eff6ff" stroke="#2563eb" stroke-width="1.7"/>
+      <text x="180" y="149" font-weight="700" fill="#1d4ed8">命中行过滤？</text>
+      <text x="180" y="166" font-size="10" fill="#475569">过滤列取值匹配</text>
+
+      <polygon points="352,116 440,153 352,190 264,153" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.7"/>
+      <text x="352" y="149" font-weight="700" fill="#5b21b6">Excel 值是</text>
+      <text x="352" y="165" font-size="10" fill="#6d28d9">NA 占位符？</text>
+
+      <polygon points="521,116 606,153 521,190 436,153" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.7"/>
+      <text x="521" y="149" font-weight="700">期望值可判定？</text>
+      <text x="521" y="166" font-size="10" fill="#64748b">value_map 归一化</text>
+
+      <polygon points="721,116 806,153 721,190 636,153" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.7"/>
+      <text x="721" y="149" font-weight="700">板级配置有</text>
+      <text x="721" y="166" font-size="10" fill="#64748b">对应落点？</text>
+
+      <rect x="257" y="8" width="190" height="44" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.7"/>
+      <text x="352" y="27" font-weight="700" fill="#475569">不适用</text>
+      <text x="352" y="44" font-size="10.5" fill="#64748b">噪声 / 占位 / 模板行</text>
+
+      <rect x="856" y="131" width="176" height="44" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.7"/>
+      <text x="944" y="150" font-weight="700" fill="#c2410c">缺失</text>
+      <text x="944" y="167" font-size="10.5" fill="#9a3412">Excel 有 · 代码无</text>
+
+      <rect x="636" y="212" width="190" height="44" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.7"/>
+      <text x="731" y="231" font-weight="700">比较 期望 vs 实际</text>
+      <text x="731" y="248" font-size="10.5" fill="#64748b">逐属性比对</text>
+
+      <rect x="250" y="292" width="190" height="46" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.7"/>
+      <text x="345" y="311" font-weight="700" fill="#5b21b6">模型复核</text>
+      <text x="345" y="328" font-size="10.5" fill="#6d28d9">置信度 ≥ 阈值才采纳</text>
+
+      <rect x="560" y="292" width="170" height="46" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.7"/>
+      <text x="645" y="311" font-weight="700" fill="#14532d">一致</text>
+      <text x="645" y="328" font-size="10.5" fill="#166534">期望 = 实际</text>
+
+      <rect x="790" y="292" width="170" height="46" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.7"/>
+      <text x="875" y="311" font-weight="700" fill="#991b1b">不一致</text>
+      <text x="875" y="328" font-size="10.5" fill="#7f1d1d">期望 ≠ 实际 → 可写回</text>
+    </g>
+    <g stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#da)">
+      <line x1="112" y1="153" x2="96" y2="153"/>
+      <line x1="268" y1="153" x2="260" y2="153"/>
+      <line x1="440" y1="153" x2="432" y2="153"/>
+      <line x1="606" y1="153" x2="632" y2="153"/>
+      <path d="M180,116 L180,84 L232,84 L232,30 L253,30"/>
+      <path d="M352,116 L352,56"/>
+      <path d="M721,190 L721,208"/>
+      <path d="M806,153 L852,153"/>
+      <path d="M521,190 L521,254 L345,254 L345,288"/>
+      <path d="M700,256 L700,274 L645,274 L645,288"/>
+      <path d="M762,256 L762,274 L875,274 L875,288"/>
+    </g>
+    <g font-size="10.5" fill="#64748b">
+      <text x="115" y="143">是</text>
+      <text x="243" y="143">是</text>
+      <text x="412" y="143">否</text>
+      <text x="606" y="143">是</text>
+      <text x="818" y="143">否</text>
+      <text x="188" y="78">否</text>
+      <text x="360" y="90">是</text>
+      <text x="529" y="246">否</text>
+      <text x="660" y="268">相等</text>
+      <text x="800" y="268">不等</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption><b>图 4-1　</b>判定决策树：行过滤 → NA 占位 → 期望值归一化 → 板级配置落点查找 → 比较期望与实际，得出六种结论之一。</figcaption>
+</section>
+
+<section id="s5">
+  <h2><span class="no">5</span>NTK / RTK 规则差异</h2>
+  <p>工具用「核对档案（profile）」描述不同芯片系列的核对口径，配置文件位于 <code>config/profiles/</code>。</p>
+
+  <table class="tight">
+    <thead><tr><th style="width:130px">对比项</th><th>NTK（Novatek）</th><th>RTK（Realtek RL6829）</th></tr></thead>
+    <tbody>
+      <tr><td>核对对象</td><td><b>端口位表</b> <code>PORT_X_DEFAULT_OUT / DIR / PP</code></td><td><b>引脚复用区块</b> <code>#define _PIN_C1 (_PIN_C1_GPO_OD)</code></td></tr>
+      <tr><td>引脚来源</td><td>Excel「PIN Name」列（芯片引脚）</td><td>Excel「PIN Name」列</td></tr>
+      <tr><td>Excel 主过滤列</td><td><code>gpio_type</code>（G 列 GPIO TYPE），空时<b>回退</b> <code>chip_section</code></td><td><code>gpio_type</code>（G 列），<b>不回退</b>，为空则不核对</td></tr>
+      <tr><td>参与核对属性</td><td>方向、输出类型、上电电平（3 项）</td><td>方向/类别、输出类型（2 项）</td></tr>
+      <tr><td>忽略项</td><td><code>PORT_X_DEFAULT_PU</code>（Excel 无对应列）</td><td>Power On / Saving / Off 三列（评审结论：默认正确）</td></tr>
+      <tr><td>噪声处理</td><td>—</td><td><code>FUNCTION$</code>、<code>(SPI)</code>、<code>KEY ADC</code>、<code>Headphone</code> 等命中即跳过</td></tr>
+      <tr><td>缺失处理</td><td>判为「缺失」</td><td><b>不核对</b>（<code>missing_action: skip</code>）</td></tr>
+      <tr><td>功能名差异</td><td>—</td><td>交大模型判定等效（阈值 0.7）</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s5-1">5.1 NTK：端口位表逐位展开</h3>
+  <p>NTK 的核心是：Excel 的一行要落到某个端口的<b>某一位</b>上。</p>
+
+  <div class="svg-scroll">
+  <svg viewBox="0 0 1040 340" xmlns="http://www.w3.org/2000/svg" font-family="'Microsoft YaHei','Segoe UI',sans-serif">
+    <rect x="14" y="20" width="264" height="104" rx="10" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.8"/>
+    <text x="26" y="42" font-size="12.5" font-weight="700" fill="#075985">Excel HSI 第 8 行</text>
+    <g font-size="11.5" fill="#0c4a6e">
+      <text x="26" y="64">PIN Name</text><text x="140" y="64" font-family="Consolas,monospace" font-weight="700">PC1</text>
+      <text x="26" y="86">Schematic Function</text><text x="140" y="86" font-family="Consolas,monospace">ON_BACKLIGHT</text>
+      <text x="26" y="108">G · GPIO TYPE</text><text x="140" y="108" font-family="Consolas,monospace">OUT</text>
+    </g>
+
+    <rect x="14" y="150" width="264" height="140" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
+    <text x="26" y="172" font-size="12.5" font-weight="700" fill="#14532d">BoardCfg.h 第 26 行</text>
+    <text x="26" y="196" font-family="Consolas,monospace" font-size="11.5" fill="#14532d">#define PORT_C_DEFAULT_OUT</text>
+    <g font-size="9.5" text-anchor="middle" fill="#64748b">
+      <text x="119" y="214">bit7</text><text x="138" y="214">bit6</text><text x="157" y="214">bit5</text><text x="176" y="214">bit4</text>
+      <text x="195" y="214">bit3</text><text x="214" y="214">bit2</text><text x="233" y="214" fill="#dc2626" font-weight="700">bit1</text><text x="252" y="214">bit0</text>
+    </g>
+    <g font-family="Consolas,monospace" font-size="11.5" text-anchor="middle">
+      <rect x="110" y="218" width="19" height="20" fill="#bbf7d0" stroke="#16a34a"/><text x="119" y="233" fill="#14532d">H</text>
+      <rect x="129" y="218" width="19" height="20" fill="#bbf7d0" stroke="#16a34a"/><text x="138" y="233" fill="#14532d">H</text>
+      <rect x="148" y="218" width="19" height="20" fill="#bbf7d0" stroke="#16a34a"/><text x="157" y="233" fill="#14532d">H</text>
+      <rect x="167" y="218" width="19" height="20" fill="#bbf7d0" stroke="#16a34a"/><text x="176" y="233" fill="#14532d">H</text>
+      <rect x="186" y="218" width="19" height="20" fill="#bbf7d0" stroke="#16a34a"/><text x="195" y="233" fill="#14532d">H</text>
+      <rect x="205" y="218" width="19" height="20" fill="#bbf7d0" stroke="#16a34a"/><text x="214" y="233" fill="#14532d">L</text>
+      <rect x="224" y="218" width="19" height="20" fill="#fecaca" stroke="#dc2626" stroke-width="2"/><text x="233" y="233" fill="#991b1b" font-weight="700">L</text>
+      <rect x="243" y="218" width="19" height="20" fill="#bbf7d0" stroke="#16a34a"/><text x="252" y="233" fill="#14532d">H</text>
+    </g>
+    <text x="26" y="233" font-family="Consolas,monospace" font-size="11.5" fill="#14532d">BitsToByte(</text>
+    <text x="264" y="233" font-family="Consolas,monospace" font-size="11.5" fill="#14532d">)</text>
+    <text x="26" y="262" font-size="11" fill="#166534">H = HIGH（高）　L = LOW（低）</text>
+    <text x="26" y="280" font-size="11" fill="#166534">参数顺序自 bit7 → bit0</text>
+
+    <rect x="324" y="56" width="336" height="188" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.8"/>
+    <text x="338" y="80" font-size="12.5" font-weight="700">属性映射（ntk.yaml）</text>
+    <g font-size="11.5" fill="#334155">
+      <text x="338" y="110">方向</text><text x="398" y="110" fill="#64748b" font-family="Consolas,monospace">gpio_type</text>
+      <text x="496" y="110" fill="#64748b">→</text><text x="518" y="110" font-family="Consolas,monospace" font-size="10.5">PORT_C_DEFAULT_DIR[1]</text>
+      <text x="338" y="136">输出类型</text><text x="398" y="136" fill="#64748b" font-family="Consolas,monospace">io_type</text>
+      <text x="496" y="136" fill="#64748b">→</text><text x="518" y="136" font-family="Consolas,monospace" font-size="10.5">PORT_C_DEFAULT_PP[1]</text>
+      <text x="338" y="162" font-weight="700" fill="#991b1b">上电电平</text><text x="398" y="162" fill="#64748b" font-family="Consolas,monospace">power_on</text>
+      <text x="496" y="162" fill="#64748b">→</text><text x="518" y="162" font-family="Consolas,monospace" font-size="10.5" fill="#991b1b">PORT_C_DEFAULT_OUT[1]</text>
+    </g>
+    <rect x="338" y="180" width="308" height="50" rx="7" fill="#fef2f2" stroke="#fecaca"/>
+    <g font-size="11.5">
+      <text x="350" y="201" fill="#991b1b" font-weight="700">判定：期望 High ≠ 实际 LOW</text>
+      <text x="350" y="220" fill="#7f1d1d">→ 不一致，建议 set_port_bit：LOW → HIGH</text>
+    </g>
+
+    <rect x="690" y="56" width="336" height="188" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.8"/>
+    <text x="706" y="80" font-size="12.5" font-weight="700" fill="#991b1b">写回结果（只替换一个实参，排版不变）</text>
+    <rect x="706" y="92" width="304" height="52" rx="7" fill="#0f172a"/>
+    <g font-family="Consolas,monospace" font-size="10">
+      <text x="714" y="112" fill="#f87171">- BitsToByte(HIGH,HIGH,HIGH,HIGH,HIGH,LOW,LOW,HIGH)</text>
+      <text x="714" y="130" fill="#4ade80">+ BitsToByte(HIGH,HIGH,HIGH,HIGH,HIGH,LOW,HIGH,HIGH)</text>
+    </g>
+    <g font-size="11.5" fill="#7f1d1d">
+      <text x="706" y="170">落点：行 26 · 值列偏移定位于第 7 个实参</text>
+      <text x="706" y="192">修改类型：set_port_bit（端口位表单比特）</text>
+      <text x="706" y="214">同一 (端口, 位, 表) 多行期望冲突 → 禁止自动改写</text>
+    </g>
+
+    <g stroke="#64748b" stroke-width="1.8" fill="none" marker-end="url(#da)">
+      <path d="M278,72 L318,72"/>
+      <path d="M278,220 L318,220"/>
+      <path d="M660,150 L684,150"/>
+    </g>
+    <text x="520" y="318" text-anchor="middle" font-size="11.5" fill="#64748b">Excel 一行 → 端口位表某一位 → 逐属性比对 → 单比特改写</text>
+  </svg>
+  </div>
+  <figcaption><b>图 5-1　</b>NTK 核对与写回示意：Excel 行 PC1（Power On = High）落到 <code>PORT_C_DEFAULT_OUT</code> 的 <b>bit1</b>，实际为 LOW，判定不一致，写回时仅替换该位对应的实参。</figcaption>
+
+  <h3 id="s5-2">5.2 RTK：引脚复用五层判定</h3>
+  <p>RTK 核的是「引脚被复用成了哪个功能、什么电气属性」，分五层逐层收敛。</p>
+
+  <div class="svg-scroll">
+  <svg viewBox="0 0 1040 350" xmlns="http://www.w3.org/2000/svg" font-family="'Microsoft YaHei','Segoe UI',sans-serif">
+    <g font-size="12">
+      <rect x="14" y="14" width="1012" height="52" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="1.8"/>
+      <circle cx="44" cy="40" r="16" fill="#2563eb"/><text x="44" y="45" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">L0</text>
+      <text x="72" y="34" font-weight="700" fill="#1d4ed8">行筛选</text>
+      <text x="72" y="54" font-size="11.5" fill="#334155">G 列「GPIO TYPE」取值 ∈ {IN, OUT, SCL, SDA, ADC, PWM, I/O, IO, ANALOG} 的行参与核对；该列为空则整体不核对（skip_when_empty）</text>
+      <text x="1000" y="45" text-anchor="end" font-size="11" fill="#1d4ed8">127 → 58 行</text>
+
+      <rect x="14" y="76" width="1012" height="52" rx="9" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
+      <circle cx="44" cy="102" r="16" fill="#16a34a"/><text x="44" y="107" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">L1</text>
+      <text x="72" y="96" font-weight="700" fill="#14532d">电气属性</text>
+      <text x="72" y="116" font-size="11.5" fill="#334155">.h 中实际生效的复用功能 GPI / GPO_PP / GPO_OD 与 Excel G 列、H 列比对（I2C 类必须开漏 → GPO_OD）</text>
+      <text x="1000" y="107" text-anchor="end" font-size="11" fill="#14532d">确定性规则</text>
+
+      <rect x="14" y="138" width="1012" height="52" rx="9" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.8"/>
+      <circle cx="44" cy="164" r="16" fill="#7c3aed"/><text x="44" y="169" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">L2</text>
+      <text x="72" y="158" font-weight="700" fill="#5b21b6">功能名等效性</text>
+      <text x="72" y="178" font-size="11.5" fill="#334155">.h 的专用功能名与 Excel (App) 功能名不一致时 → <tspan font-weight="700">交大模型判定是否等效</tspan>；置信度 &lt; 0.7 保持「歧义」不生成修改</text>
+      <text x="1000" y="169" text-anchor="end" font-size="11" fill="#5b21b6">需模型 / 人工</text>
+
+      <rect x="14" y="200" width="1012" height="52" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.8"/>
+      <circle cx="44" cy="226" r="16" fill="#64748b"/><text x="44" y="231" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">L3</text>
+      <text x="72" y="220" font-weight="700" fill="#475569">存在性</text>
+      <text x="72" y="240" font-size="11.5" fill="#334155">.h 中没有该网络名的区块 → <tspan font-weight="700">不核对</tspan>（missing_action: skip），不算缺失、不报警</text>
+      <text x="1000" y="231" text-anchor="end" font-size="11" fill="#475569">跳过 23 行</text>
+
+      <rect x="14" y="262" width="1012" height="52" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.8"/>
+      <circle cx="44" cy="288" r="16" fill="#94a3b8"/><text x="44" y="293" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">L4</text>
+      <text x="72" y="282" font-weight="700" fill="#475569">噪声</text>
+      <text x="72" y="302" font-size="11.5" fill="#334155">命中模板占位符或专用功能域（FUNCTION$、(SPI)、KEY ADC、Headphone）→ 整行跳过，判为「不适用」</text>
+      <text x="1000" y="293" text-anchor="end" font-size="11" fill="#475569">跳过 25 行</text>
+    </g>
+    <text x="520" y="338" text-anchor="middle" font-size="11.5" fill="#64748b">实测（58 行参与核对）：25 一致 / 6 不一致 / 2 歧义 / 25 不适用　→　6 处可自动改写</text>
+  </svg>
+  </div>
+  <figcaption><b>图 5-2　</b>RTK 五层判定：L0 行筛选 → L1 电气属性 → L2 功能名等效（交模型）→ L3 存在性 → L4 噪声。</figcaption>
+</section>
+
+<section id="s6">
+  <h2><span class="no">6</span>安全写回机制</h2>
+  <p>写回是本工具<b>唯一改动源文件</b>的环节，因此设了多道闸门。</p>
+
+  <table class="tight">
+    <thead><tr><th style="width:150px">闸门</th><th>规则</th></tr></thead>
+    <tbody>
+      <tr><td><b>白名单编辑</b></td><td>只允许改写：宏右值（<code>set_macro</code>）、结构体字段（<code>set_struct_field</code>）、数组元素（<code>set_array_item</code>）、<b>端口位表单比特</b>（<code>set_port_bit</code>）。其它类型一律跳过并记入日志。</td></tr>
+      <tr><td><b>落点唯一性</b></td><td>同一 <code>(行号, 值列偏移)</code> 被多条变更命中 → 视为落点冲突，后一条跳过。</td></tr>
+      <tr><td><b>原值校验</b></td><td>写入前重新读取原值；与核对时的原值不一致 → 说明文件已被他人改动，跳过该条。</td></tr>
+      <tr><td><b>冲突守卫</b></td><td>NTK 档案 <code>conflict_guard: true</code>：同一 <code>(端口, 位, 位表)</code> 被多行要求且期望值互相冲突 → <b>禁止自动改写</b>。</td></tr>
+      <tr><td><b>备份 + 复检</b></td><td>写回前备份到 <code>.genboard/backup/</code>；写回后执行结构校验与逐属性语义复检，任一失败自动回滚。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.1 文件落点</h3>
+  <table class="tight">
+    <thead><tr><th style="width:210px">产物</th><th>路径</th></tr></thead>
+    <tbody>
+      <tr><td>工作区</td><td><code>&lt;板级配置文件所在目录&gt;\.genboard\</code></td></tr>
+      <tr><td>备份文件</td><td><code>.genboard\backup\YYYYmmdd_HHMMSS_&lt;原文件名&gt;.bak</code></td></tr>
+      <tr><td>运行日志</td><td><code>.genboard\logs\</code></td></tr>
+      <tr><td>导出报告</td><td>对话框指定位置，默认 <code>.genboard\report.html</code> 与同名 <code>.csv</code></td></tr>
+      <tr><td>本地设置</td><td><code>config/settings.local.yaml</code>（自动 gitignore）</td></tr>
+      <tr><td>API Key</td><td><code>config/secrets.bin</code>（Windows DPAPI 加密，不入 YAML / 日志 / 报告）</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note danger">
+    <b>执行纪律</b>
+    正式改板级配置前，先在<b>副本</b>上走一遍完整流程；确认 diff 符合预期后再对正本执行。工具的 <code>tools/smoke_real.py</code> 就是「在副本上写回、不动原文件」的回归脚本。
+  </div>
+</section>
+
+<section id="s7">
+  <h2><span class="no">7</span>设置与模型接入</h2>
+  <p>点工具条「设置」（<code>Ctrl+,</code>）。设置写入 <code>config/settings.local.yaml</code>，<b>不修改</b> <code>config/settings.yaml</code> 与档案文件本身。</p>
+
+  <figure>
+    <div class="anno">
+      <img src="sop/05_settings.png" alt="设置对话框" style="max-width:560px;margin:0 auto">
+      <span class="pin" style="left:22%;top:8%">1</span>
+      <span class="pin" style="left:22%;top:22%">2</span>
+      <span class="pin" style="left:22%;top:50%">3</span>
+      <span class="pin" style="left:22%;top:81%">4</span>
+    </div>
+    <figcaption><b>图 7-1　</b>设置对话框：① 项目系列与行过滤　② 大模型后端与凭据　③ 模型采纳阈值　④ 核对策略与脱敏开关。</figcaption>
+  </figure>
+
+  <h3>7.1 项目</h3>
+  <table class="tight">
+    <thead><tr><th style="width:150px">项</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>项目系列</td><td><b>自动检测</b>（默认，按板级配置文件特征）/ <b>NTK</b> / <b>RTK</b>。选错会导致核对口径错误，建议保持自动。</td></tr>
+      <tr><td>行过滤 · 过滤列</td><td>只核对该列取值命中的行。NTK 默认 <code>gpio_type</code>；若目标表该列为空，改 <code>chip_section</code>。</td></tr>
+      <tr><td>行过滤 · 取值</td><td>逗号分隔，如 <code>IN, OUT</code> 或 <code>OUTPUT, INPUT</code>。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>7.2 大模型</h3>
+  <table class="tight">
+    <thead><tr><th style="width:150px">项</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>后端</td><td><b>离线 Mock</b>（默认，无需密钥，用于演示与回归）/ <b>OpenAI 兼容</b>（OpenAI、DeepSeek、通义、自建网关）/ <b>Anthropic</b>（预留）</td></tr>
+      <tr><td>Base URL / 模型</td><td>例如 <code>https://api.openai.com/v1</code> + <code>gpt-4o-mini</code></td></tr>
+      <tr><td>API Key</td><td>输入后经 <b>Windows DPAPI</b> 加密保存到 <code>config/secrets.bin</code>，优先级高于 YAML 里的 <code>llm.api_key</code></td></tr>
+      <tr><td>测试连接</td><td>用当前参数发一次最小请求，<b>立刻暴露</b>地址/鉴权/模型名问题</td></tr>
+      <tr><td>每批条数 / 重试次数</td><td>默认 20 / 3；批量越大吞吐越高但单次失败影响面越大</td></tr>
+      <tr><td>请求端 JSON Schema</td><td>勾选后由服务端约束模型输出格式，提升结构化解析成功率</td></tr>
+      <tr><td>模型采纳阈值</td><td>默认 <b>70%</b>；模型置信度低于该值 → 保持「歧义」，<b>不生成修改</b></td></tr>
+    </tbody>
+  </table>
+
+  <h3>7.3 核对策略</h3>
+  <table class="tight">
+    <thead><tr><th style="width:150px">项</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>置信度阈值</td><td>默认 <code>0.8</code>；低于该值的规则结论降级为「歧义」</td></tr>
+      <tr><td>启用大模型核对</td><td>关闭则只用规则判定，<b>完全离线</b>，速度快且无隐私外发</td></tr>
+      <tr><td>脱敏敏感信息</td><td>送往云端前脱敏；建议保持开启</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="s8">
+  <h2><span class="no">8</span>常见问题排查</h2>
+  <table class="tight">
+    <thead><tr><th style="width:230px">现象</th><th>原因与处理</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>「开始核对」按钮灰色不可点</td>
+        <td>必须<b>同时</b>选定「GPIO 表」和「板级配置」两个文件，缺一不可。</td>
+      </tr>
+      <tr>
+        <td>概览「行过滤」显示参与 0 行</td>
+        <td>主过滤列在目标表中为空。工具会自动回退到备用列并在左下角标注「（回退）」；若仍为 0 行，到「设置 → 行过滤」改过滤列与取值。</td>
+      </tr>
+      <tr>
+        <td>核对档案显示「通用模式」</td>
+        <td>未匹配到 NTK/RTK 档案。在「设置 → 项目系列」手动指定；确认板级配置文件选对了（RTK 应选 <code>*PINSHARE.h</code>）。</td>
+      </tr>
+      <tr>
+        <td>警告区出现「模型调用失败」</td>
+        <td>在「设置」里点<b>「测试连接」</b>逐项排查：Base URL 是否正确、API Key 是否有效/过期、模型名是否可用。离线演示可切回 <b>离线 Mock</b>。</td>
+      </tr>
+      <tr>
+        <td>预览提示「跳过 N 条」</td>
+        <td>这些行<b>不能自动改写</b>：无法唯一定位、落点冲突、原值已变或期望冲突。原因写在「运行日志」，需人工在 <code>.h</code> 中直接修改。</td>
+      </tr>
+      <tr>
+        <td>点「应用修改」后提示「已回滚」</td>
+        <td>结构校验或语义复检未通过，源文件已自动还原。看「运行日志」的 <code>已修复 / 未消除 / 新增差异</code>；备份在 <code>.genboard\backup\</code>，可手工比对。</td>
+      </tr>
+      <tr>
+        <td>「文件指纹」与核对时不一致</td>
+        <td>板级配置在核对后被其它工具改动。重新点「开始核对」再走一遍流程。</td>
+      </tr>
+      <tr>
+        <td>PowerShell 提示「禁止运行脚本」</td>
+        <td>用 <code>run_gui.bat</code>（不受影响）；或 <code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</code> 仅放开当前会话。</td>
+      </tr>
+      <tr>
+        <td>命令行 <code>python</code> 指向 Microsoft Store</td>
+        <td>当前终端 PATH 是安装前的旧值，<b>重开一个终端</b>即可；或直接用 <code>.venv\Scripts\python.exe</code>。</td>
+      </tr>
+      <tr>
+        <td>生成的截图里中文是方块</td>
+        <td>仅离屏截图工具的现象（Qt offscreen 默认不加载系统字体）。执行时设置 <code>QT_QPA_FONTDIR=C:\Windows\Fonts</code>；<b>实际 GUI 界面正常显示中文</b>。</td>
+      </tr>
+      <tr>
+        <td>核对很慢</td>
+        <td>关闭大模型可立即提速；或调小「每批条数」以外的手段 —— 优先检查是否核对了不必要的行（收紧行过滤）。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>8.1 常用命令</h3>
+<pre><code><span class="c">:: 单元测试</span>
+.venv\Scripts\python.exe -m pytest tests -q
+
+<span class="c">:: 真实样例端到端（在副本上做写回，不动原文件）</span>
+.venv\Scripts\python.exe tools\smoke_real.py
+
+<span class="c">:: RTK 样例端到端</span>
+.venv\Scripts\python.exe tools\smoke_rtk.py
+
+<span class="c">:: 离屏 GUI 冒烟</span>
+.venv\Scripts\python.exe tools\gui_smoke.py
+
+<span class="c">:: 重新生成 SOP 截图（中文正常显示）</span>
+$env:QT_QPA_FONTDIR="C:\Windows\Fonts"
+.venv\Scripts\python.exe tools\sop_screenshot.py</code></pre>
+</section>
+
+<section id="s9">
+  <h2><span class="no">9</span>附录</h2>
+
+  <h3>9.1 相关文档</h3>
+  <table class="tight">
+    <thead><tr><th style="width:250px">文档</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td><code>README.md</code></td><td>项目总览、快速开始、目录结构</td></tr>
+      <tr><td><code>docs/requirements.md</code></td><td>需求分析：目标、范围、功能与非功能需求、异常场景</td></tr>
+      <tr><td><code>docs/architecture.md</code></td><td>架构设计：分层、流程、LLM 集成、ADR</td></tr>
+      <tr><td><code>docs/comparison_rules.md</code></td><td>NTK 核对规则：端口位表口径、逐属性映射、实测结论</td></tr>
+      <tr><td><code>docs/comparison_rules_rtk.md</code></td><td>RTK 核对规则：五层判定、量化结果、待确认项</td></tr>
+      <tr><td><code>docs/SOP.html</code></td><td><b>本文档</b>：带图示的标准操作规程</td></tr>
+    </tbody>
+  </table>
+
+  <h3>9.2 核对档案速查</h3>
+  <table class="tight">
+    <thead><tr><th style="width:150px">档案</th><th>Excel 侧</th><th>C 侧</th><th>关键配置</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>NTK</b><br><code>config/profiles/ntk.yaml</code></td>
+        <td>Sheet <code>HSI</code>；列：pin_name / net_name / gpio_type / io_type / power_on</td>
+        <td><code>PORT_{port}_DEFAULT_{OUT|DIR|PP}</code>，位序 <code>desc</code>（bit7 → bit0）</td>
+        <td><code>row_filter.field: gpio_type</code>，<code>fallback: chip_section</code>，<code>conflict_guard: true</code></td>
+      </tr>
+      <tr>
+        <td><b>RTK</b><br><code>config/profiles/rtk.yaml</code></td>
+        <td>Sheet <code>HSI</code>；列：pin_name / net_name / gpio_type / io_type</td>
+        <td><code>_PIN_{PAD} (_PIN_{PAD}_{FUNC})</code> 复用区块</td>
+        <td><code>generic_gpio: GPI/GPO_PP/GPO_OD</code>，<code>missing_action: skip</code>，<code>llm_confidence_threshold: 0.7</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>9.3 NTK 逐属性映射（Excel 列 ↔ 板级配置宏）</h3>
+  <table class="tight">
+    <thead><tr><th style="width:230px">板级配置宏</th><th style="width:230px">Excel 列</th><th>属性</th></tr></thead>
+    <tbody>
+      <tr><td><code>PORT_X_DEFAULT_DIR[bit]</code></td><td><strong>G 列</strong>「GPIO TYPE(输入输出类别)」</td><td>方向</td></tr>
+      <tr><td><code>PORT_X_DEFAULT_PP[bit]</code></td><td><strong>H 列</strong>「Output PIN 设定类型」</td><td>输出类型（1=推挽 0=开漏）</td></tr>
+      <tr><td><code>PORT_X_DEFAULT_OUT[bit]</code></td><td><strong>I 列</strong>「Power On」</td><td>上电电平</td></tr>
+      <tr><td><code>PORT_X_DEFAULT_PU</code></td><td>—</td><td><b>暂时忽略</b>（Excel 无对应列）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>9.4 建议归档内容</h3>
+  <table class="tight">
+    <thead><tr><th style="width:230px">归档项</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>核对报告 HTML / CSV</td><td>结论 + 证据 + 差异 + 统计，用于评审与追溯</td></tr>
+      <tr><td>导出的 <code>*.patch</code></td><td>如需走代码评审流程，可用「差异预览 → 导出 patch」</td></tr>
+      <tr><td>运行日志</td><td>含模型交互记录，用于复核模型判定过程</td></tr>
+      <tr><td>写回备份 <code>*.bak</code></td><td>位于 <code>.genboard\backup\</code>，出现异常时用于手工还原</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+</div>
+</body>
+</html>

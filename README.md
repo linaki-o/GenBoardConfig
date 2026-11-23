@@ -221,6 +221,7 @@ python tools/inspect_rtk_rules2.py  :: RTK 规则分层量化
 
 | 文档 | 内容 |
 |---|---|
+| **[docs/SOP.html](docs/SOP.html)** | **带图示的使用 SOP**：环境准备、界面分区、七步操作流程、状态图例、NTK/RTK 规则差异、安全写回机制、常见问题排查 |
 | [docs/requirements.md](docs/requirements.md) | 需求分析：目标、范围、功能/非功能需求、异常场景 |
 | [docs/architecture.md](docs/architecture.md) | 架构设计：分层图、流程图、LLM 集成、ADR |
 | [docs/comparison_rules.md](docs/comparison_rules.md) | **NTK 核对规则**：端口位表口径、逐属性映射、实测结论 |
