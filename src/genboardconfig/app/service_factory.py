@@ -9,6 +9,7 @@ from ..infra.llm.orchestrator import LLMOrchestrator
 from ..infra.llm.masker import Masker
 from ..infra.llm.prompt_repo import PromptRepo
 from ..infra.llm.provider.base import LLMProvider
+from ..infra.llm.provider.credential import clean_credential
 from ..infra.llm.provider.mock import MockProvider
 from ..infra.llm.provider.openai_compatible import OpenAICompatibleProvider
 from ..infra.secrets.store import SecretStore
@@ -24,11 +25,12 @@ def secret_store(settings: Settings) -> SecretStore:
 
 
 def resolve_api_key(settings: Settings) -> str:
+    """取 API Key 并清洗：去掉复制时带入的尾部换行，否则请求头非法。"""
     store = secret_store(settings)
-    key = store.get(SECRET_KEY_NAME)
+    key = clean_credential(store.get(SECRET_KEY_NAME))
     if key:
         return key
-    return settings.get("llm.api_key", "") or ""
+    return clean_credential(settings.get("llm.api_key", "") or "")
 
 
 def load_profiles(settings: Settings) -> list:

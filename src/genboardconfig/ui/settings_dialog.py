@@ -24,6 +24,7 @@ from ..app.service_factory import (
     resolve_api_key,
     secret_store,
 )
+from ..infra.llm.provider.credential import clean_credential
 from ..infra.settings import Settings
 
 
@@ -73,15 +74,15 @@ class SettingsDialog(QDialog):
         self.model = QLineEdit(settings.get("llm.model", ""))
         form.addRow("模型", self.model)
 
-        self.api_key = QLineEdit(secret_store(settings).get(SECRET_KEY_NAME))
+        self.api_key = QLineEdit(clean_credential(secret_store(settings).get(SECRET_KEY_NAME)))
         self.api_key.setEchoMode(QLineEdit.Password)
         self.api_key.setPlaceholderText("留空则使用设置文件中的 llm.api_key")
         form.addRow("API Key", self.api_key)
 
         key_row = QHBoxLayout()
         store = secret_store(settings)
-        dpapi_key = store.get(SECRET_KEY_NAME)
-        yaml_key = settings.get("llm.api_key") or ""
+        dpapi_key = clean_credential(store.get(SECRET_KEY_NAME))
+        yaml_key = clean_credential(settings.get("llm.api_key") or "")
         if dpapi_key:
             source_text = "系统凭据库（DPAPI）—— 优先级高于配置文件"
         elif yaml_key:
@@ -251,7 +252,9 @@ class SettingsDialog(QDialog):
                 },
             )
         s.save_local()
-        if self.api_key.text():
-            secret_store(s).set(SECRET_KEY_NAME, self.api_key.text())
+        # 去掉复制时带入的首尾空白/换行：非法字符会让请求头被 httpx 拒绝
+        key = clean_credential(self.api_key.text())
+        if key:
+            secret_store(s).set(SECRET_KEY_NAME, key)
             s.set("llm.api_key", "")
         self.accept()

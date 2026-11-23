@@ -9,6 +9,7 @@ import time
 import httpx
 
 from .base import LLMProvider, LLMRequest, LLMResponse, TokenUsage
+from .credential import clean_credential, redact
 
 PRICE_PER_1K = 0.0005  # 粗略估算，可在设置中覆盖
 
@@ -26,7 +27,8 @@ class OpenAICompatibleProvider(LLMProvider):
         use_structured_output: bool = True,
     ):
         self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+        # 末尾换行等非法字符会让 httpx 抛 Illegal header value，这里统一清洗
+        self.api_key = clean_credential(api_key)
         self.model = model
         self.timeout = timeout
         self.max_retries = max_retries
@@ -62,7 +64,9 @@ class OpenAICompatibleProvider(LLMProvider):
                         f"{self.base_url}/chat/completions", json=payload, headers=headers
                     )
                 if resp.status_code >= 400:
-                    last_error = f"HTTP {resp.status_code}: {resp.text[:300]}"
+                    last_error = redact(
+                        f"HTTP {resp.status_code}: {resp.text[:300]}", self.api_key
+                    )
                     if resp.status_code in (401, 403, 404):
                         break
                     time.sleep(min(2 ** attempt, 8))
@@ -86,8 +90,12 @@ class OpenAICompatibleProvider(LLMProvider):
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     raw=data,
                 )
+            except httpx.LocalProtocolError as exc:
+                # 请求头非法（如密钥带换行）：重试无意义，直接报错
+                last_error = redact(f"{type(exc).__name__}: {exc}", self.api_key)
+                break
             except Exception as exc:  # noqa: BLE001
-                last_error = f"{type(exc).__name__}: {exc}"
+                last_error = redact(f"{type(exc).__name__}: {exc}", self.api_key)
                 time.sleep(min(2 ** attempt, 8))
         return LLMResponse(error=last_error or "unknown error")
 
