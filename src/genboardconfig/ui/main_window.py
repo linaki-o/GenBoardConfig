@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSortFilterProxyModel, Qt, Signal
+from PySide6.QtCore import QSortFilterProxyModel, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -57,6 +57,9 @@ from .workers import Worker
 
 EXCEL_FILTER = "Excel 文件 (*.xlsx *.xlsm);;所有文件 (*.*)"
 C_FILTER = "C 源文件 (*.c *.h);;所有文件 (*.*)"
+
+# 黄金比例 φ ≈ 1.618，中部主表与右侧「条目详情」按此比例分配宽度
+GOLDEN_RATIO = (1 + 5**0.5) / 2
 
 
 class _DetailRow:
@@ -126,6 +129,11 @@ class MainWindow(QMainWindow):
         self.report_usecase = ReportUseCase()
         self.worker: Worker | None = None
         self.preview: ApplyOutcome | None = None
+
+        # 侧栏可见性偏好：左侧「核对概览」默认折叠，右侧「条目详情」默认展开
+        self._left_dock_visible = False
+        self._right_dock_visible = True
+        self._ratio_timer: QTimer | None = None
 
         self._build_ui()
         self._build_actions()
@@ -347,6 +355,8 @@ class MainWindow(QMainWindow):
         dock.setWidget(widget)
         self.addDockWidget(Qt.LeftDockWidgetArea, dock)
         self.left_dock = dock
+        # 默认折叠：主表与详情是主工作区，概览按需从「视图」菜单展开
+        dock.setVisible(False)
 
     def _build_right_dock(self) -> None:
         dock = QDockWidget("条目详情", self)
@@ -409,6 +419,78 @@ class MainWindow(QMainWindow):
         menu.addAction(act_report)
         menu.addSeparator()
         menu.addAction(act_settings)
+
+        view_menu = self.menuBar().addMenu("视图")
+        self.act_left_dock = QAction("核对概览", self)
+        self.act_left_dock.setCheckable(True)
+        self.act_left_dock.setChecked(self._left_dock_visible)
+        self.act_left_dock.toggled.connect(self._on_left_dock_toggled)
+        view_menu.addAction(self.act_left_dock)
+
+        self.act_right_dock = QAction("条目详情", self)
+        self.act_right_dock.setCheckable(True)
+        self.act_right_dock.setChecked(self._right_dock_visible)
+        self.act_right_dock.toggled.connect(self._on_right_dock_toggled)
+        view_menu.addAction(self.act_right_dock)
+
+    # ------------------------------------------------------------------
+    # 面板布局
+    # ------------------------------------------------------------------
+    def _on_left_dock_toggled(self, visible: bool) -> None:
+        self._left_dock_visible = visible
+        self._apply_dock_visibility()
+        self._schedule_pane_ratio()
+
+    def _on_right_dock_toggled(self, visible: bool) -> None:
+        self._right_dock_visible = visible
+        self._apply_dock_visibility()
+        self._schedule_pane_ratio()
+
+    def _apply_dock_visibility(self) -> None:
+        """按偏好显示侧栏；「并排对比」标签页需要整幅宽度，暂时隐藏两侧。"""
+        comparing = self.tabs.currentIndex() == self.tabs.indexOf(self.compare_view)
+        if hasattr(self, "left_dock"):
+            self.left_dock.setVisible(self._left_dock_visible and not comparing)
+        if hasattr(self, "right_dock"):
+            self.right_dock.setVisible(self._right_dock_visible and not comparing)
+
+    def _schedule_pane_ratio(self) -> None:
+        """推迟到事件循环空闲时重算比例，避免在 resize 过程中反复触发布局。"""
+        if self._ratio_timer is None:
+            self._ratio_timer = QTimer(self)
+            self._ratio_timer.setSingleShot(True)
+            self._ratio_timer.timeout.connect(self._apply_pane_ratio)
+        self._ratio_timer.start(0)
+
+    def _apply_pane_ratio(self) -> None:
+        """中部主表 : 右侧「条目详情」按黄金比例 φ ≈ 1.618 分配宽度。"""
+        center = self.centralWidget()
+        if center is None or not hasattr(self, "right_dock"):
+            return
+        if not self.right_dock.isVisible():
+            return
+        total = center.width() + self.right_dock.width()
+        if total <= 0:
+            return
+        target = int(round(total / (1 + GOLDEN_RATIO)))
+        # 两侧各自的最小宽度不能被破坏
+        min_right = self.right_dock.minimumSizeHint().width()
+        min_center = center.minimumSizeHint().width()
+        target = max(target, min_right)
+        if total - target < min_center:
+            target = total - min_center
+        target = max(target, min_right)
+        if abs(self.right_dock.width() - target) <= 1:
+            return
+        self.resizeDocks([self.right_dock], [target], Qt.Horizontal)
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._schedule_pane_ratio()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._schedule_pane_ratio()
 
     # ------------------------------------------------------------------
     # 交互
@@ -619,9 +701,8 @@ class MainWindow(QMainWindow):
 
     def _on_tab_changed(self, index: int) -> None:
         """切到「并排对比」时自动隐藏两侧面板，把整幅宽度让给左右表格。"""
-        comparing = index == self.tabs.indexOf(self.compare_view)
-        self.left_dock.setVisible(not comparing)
-        self.right_dock.setVisible(not comparing)
+        self._apply_dock_visibility()
+        self._schedule_pane_ratio()
 
     def _apply_column_widths(self) -> None:
         """按当前模式设置列宽。"""
