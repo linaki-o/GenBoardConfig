@@ -189,6 +189,51 @@ def test_missing_net_is_not_checked():
     assert "未定义" in result.notes
 
 
+def test_description_of_returns_excel_d_column():
+    """D 列「Description/ Function」取自 Excel 解析出的 description 字段。"""
+    engine = _engine()
+    req = _req("AUX1_CHP", "IN", "", "SBU2_1(App) / SBU1_1")
+    req.raw = {"description": "DPRX_AUX_P_1/SBU2_1/GPIO"}
+    assert engine.description_of(req) == "DPRX_AUX_P_1/SBU2_1/GPIO"
+    # 未提供 D 列时返回空串，不影响其它判定
+    assert engine.description_of(_req("AUX1_CHP", "IN", "", "SBU2_1(App)")) == ""
+
+
+def test_llm_review_payload_carries_excel_d_column():
+    """L2 交模型判定时必须带上 Excel D 列数据。"""
+    from types import SimpleNamespace
+
+    from genboardconfig.app.check_usecase import CheckUseCase
+
+    class _Capture:
+        def __init__(self):
+            self.items = []
+            self.stats = SimpleNamespace(messages=[])
+
+        def review_functions(self, items, progress=None):
+            self.items = list(items)
+            return {}
+
+    engine = _engine()
+    req = _req("AUX1_CHP", "IN", "", "SBU2_1(App) / SBU1_1")
+    req.raw = {"description": "DPRX_AUX_P_1/SBU2_1/GPIO"}
+    results = engine.check([req])
+    assert results[0].attribute("function_name").status == CheckStatus.AMBIGUOUS.value
+
+    orchestrator = _Capture()
+    usecase = CheckUseCase(
+        None, None, None, None, None,
+        orchestrator=orchestrator, profile=_profile(),
+    )
+    usecase._llm_function_review(results, [req], engine, lambda *a: None)
+
+    assert len(orchestrator.items) == 1
+    item = orchestrator.items[0]
+    assert item["excel_description"] == "DPRX_AUX_P_1/SBU2_1/GPIO"
+    assert item["excel_function"] == "SBU2_1"
+    assert item["header_function"] == "DPRX_AUX_P_1"
+
+
 def test_noise_net_is_skipped():
     engine = _engine()
     req = _req("CLK (SPI)", "OUT", "", "SPI_CLK(App)")

@@ -185,6 +185,8 @@ class CheckUseCase:
                     "pad": entry.group,
                     # 喂给模型的 GPIO 类别必须取 G 列，不能误传期望功能名
                     "excel_gpio_type": engine.gpio_category(req),
+                    # Excel D 列「Description/ Function」：该引脚可复用的功能描述
+                    "excel_description": engine.description_of(req),
                     "options": list(entry.members)[:20],
                 }
             )

@@ -87,6 +87,18 @@ typedef enum
 | `.h` 选中**专用功能**，与 Excel (App) 名归一化后相同 | 一致 |
 | `.h` 选中**专用功能**，与 Excel (App) 名不同 | **歧义** → 交大模型判定是否等效（例：`AUX1_CHP` 期望 `SBU2_1`，`.h` 用 `DPRX_AUX_P_1`） |
 
+交大模型判定时，每条送入模型的输入为：
+
+| 字段 | 来源 | 说明 |
+|---|---|---|
+| `net_name` | F 列「Schematic Function」 | 原理图网络名 |
+| `excel_function` | C 列「PIN Name」中带 (App) 的功能名 | Excel 期望功能 |
+| `header_function` | `.h` 中 `#define` 选中的复用功能 | 配置实际功能 |
+| `pad` | `.h` 宏组 | 引脚编号 |
+| `excel_gpio_type` | G 列「GPIO TYPE」 | 电气方向 |
+| `excel_description` | **D 列「Description/ Function」** | 该引脚在原理图上允许的复用功能清单（可为空） |
+| `options` | `.h` 枚举成员 | 该 pad 在配置文件中可选的功能清单 |
+
 ### L3 存在性层
 
 | 情形 | 结论 |

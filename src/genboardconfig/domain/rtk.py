@@ -75,6 +75,7 @@ class RtkEngine:
         self.missing_action = str(cfg.get("missing_action") or "skip")
         self.llm_equivalence = bool(cfg.get("llm_function_equivalence", True))
         self.llm_threshold = float(cfg.get("llm_confidence_threshold", 0.7))
+        self.llm_description_field = str(cfg.get("llm_description_field") or "description")
 
     # ------------------------------------------------------------------
     def check(self, requirements: list[GPIORequirement]) -> list[MatchResult]:
@@ -445,6 +446,11 @@ class RtkEngine:
     def gpio_category(self, req: GPIORequirement) -> str:
         """该行 Excel 的 GPIO 类别（G 列），用于喂给模型。"""
         return (self._attr_value(req, "gpio_type") or "").strip().upper()
+
+    def description_of(self, req: GPIORequirement) -> str:
+        """该行 Excel D 列「Description/ Function」，用于喂给模型。"""
+        raw = (req.raw or {}).get(self.llm_description_field, "")
+        return str(raw or "").strip()
 
     # ------------------------------------------------------------------
     def _profile_value(self, req: GPIORequirement, field_name: str) -> str:

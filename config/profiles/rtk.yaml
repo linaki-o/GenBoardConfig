@@ -26,7 +26,8 @@ excel:
     power_on: ["power on"]
     power_saving: ["power saving"]
     power_off: ["power off"]
-    description: ["description"]
+    # D 列「Description/ Function」：该引脚可复用的功能描述
+    description: ["description/ function", "description"]
     bom_ref: ["pin #"]
     remark: ["remark", "check result remark"]
 
@@ -100,3 +101,6 @@ c_config:
   # 专用功能名与 Excel (App) 功能名不一致时 → 交大模型判定等效关系
   llm_function_equivalence: true
   llm_confidence_threshold: 0.7
+
+  # L2 交模型判定时附带的 Excel D 列（Description/ Function）字段名
+  llm_description_field: description

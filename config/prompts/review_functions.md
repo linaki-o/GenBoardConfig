@@ -6,6 +6,7 @@
 - `header_function`：板级配置 `#define _PIN_<PAD> (_PIN_<PAD>_<FUNC>)` 中实际选中的功能（如 DPRX_AUX_P_1）
 - `pad`：引脚编号
 - `excel_gpio_type`：Excel 的 GPIO 类别（IN / OUT / SCL / SDA / ADC）
+- `excel_description`：Excel D 列「Description/ Function」——该引脚可复用的功能清单（可能为空）
 - `options`：该引脚在配置文件中可选的功能清单
 
 # 判定要点
@@ -13,8 +14,11 @@
    只要电气方向与 `excel_gpio_type` 兼容，即视为等效。
 2. 若两者指向同一硬件信号的不同叫法（如 SBU2_1 与 DPRX_AUX_P_1 都是 DP_AUX 差分对），
    且该引脚可选功能中确实包含对应项，视为等效。
-3. 方向不兼容（Excel 要求输入而配置是输出专用功能，或反之）→ 不等效。
-4. 无法判断时给出低置信度，由人工确认。
+3. `excel_description` 列出该引脚在原理图上允许的复用功能，
+   若 `excel_function` 与 `header_function` 都能在其中找到（或互为别名），视为等效；
+   若 `header_function` 不在该清单内，说明配置选错了复用功能，判为不等效。
+4. 方向不兼容（Excel 要求输入而配置是输出专用功能，或反之）→ 不等效。
+5. 无法判断时给出低置信度，由人工确认。
 
 # 输出
 严格按 JSON Schema 输出 `{"results": [{"requirement_id","equivalent","confidence","reason","electrical_match","electrical_reason"}]}`。

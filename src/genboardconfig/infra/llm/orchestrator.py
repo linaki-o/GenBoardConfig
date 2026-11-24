@@ -125,7 +125,7 @@ class LLMOrchestrator:
         """功能名等效关系复核（RTK 专用功能名 vs Excel (App) 功能名）。
 
         items: [{requirement_id, net_name, excel_function, header_function,
-                 pad, excel_gpio_type, options:[...]}]
+                 pad, excel_gpio_type, excel_description, options:[...]}]
         返回 {requirement_id: (equivalent, confidence, reason)}
         """
         out: dict[str, tuple[bool, float, str, bool | None, str]] = {}
