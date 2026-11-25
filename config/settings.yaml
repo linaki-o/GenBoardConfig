@@ -8,11 +8,16 @@ llm:
   base_url: "https://api.openai.com/v1"
   model: "gpt-4o-mini"
   api_key: ""            # 建议改用凭据存储（设置页"保存到系统凭据"）
-  timeout_seconds: 60
+  # 推理模型（如 MiniMax-M3）思考阶段就要 2000+ token，单次请求可能跑到几十秒，
+  # 超时上限给足，避免误判为「模型调用失败」
+  timeout_seconds: 180
   max_retries: 3
   temperature: 0.0
   max_batch_size: 20
   use_structured_output: true     # 请求端 json_schema 约束输出
+  # 功能名等效性判定（RTK L2）：每批条数与输出预算
+  review_batch_size: 3
+  review_max_tokens: 8192
 
 check:
   confidence_threshold: 0.80      # 低于此值降级为 ambiguous

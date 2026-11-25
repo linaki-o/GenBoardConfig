@@ -93,6 +93,7 @@ class MockProvider(LLMProvider):
                 completion_tokens=len(content) // 3,
             ),
             latency_ms=int((time.perf_counter() - started) * 1000),
+            finish_reason="stop",
         )
 
     # ------------------------------------------------------------------

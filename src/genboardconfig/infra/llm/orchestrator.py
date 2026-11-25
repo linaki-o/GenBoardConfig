@@ -54,6 +54,8 @@ class LLMOrchestrator:
         temperature: float = 0.0,
         batch_size: int = 20,
         max_tokens: int = 3072,
+        review_batch_size: int = 3,
+        review_max_tokens: int = 8192,
     ):
         self.provider = provider
         self.prompt_repo = prompt_repo
@@ -61,7 +63,11 @@ class LLMOrchestrator:
         self.temperature = temperature
         self.batch_size = max(1, batch_size)
         self.max_tokens = max_tokens
+        # 功能名等效性判定：推理模型每条都要长思考，批次大 + 输出预算小就会被截断
+        self.review_batch_size = max(1, review_batch_size)
+        self.review_max_tokens = review_max_tokens
         self.stats = OrchestratorStats()
+        self._review_failures: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     def check(
@@ -121,24 +127,50 @@ class LLMOrchestrator:
         self,
         items: list[dict[str, Any]],
         progress: ProgressFn | None = None,
-    ) -> dict[str, tuple[bool, float, str]]:
+    ) -> dict[str, tuple[bool, float, str, bool | None, str]]:
         """功能名等效关系复核（RTK 专用功能名 vs Excel (App) 功能名）。
 
         items: [{requirement_id, net_name, excel_function, header_function,
                  pad, excel_gpio_type, excel_description, options:[...]}]
-        返回 {requirement_id: (equivalent, confidence, reason)}
+        返回 {requirement_id: (equivalent, confidence, reason, electrical_match,
+                              electrical_reason)}
+
+        推理模型逐条长思考，一次送太多条目会在 JSON 产出前耗尽 max_tokens，
+        因此按 review_batch_size 分批请求，逐批合并结论。
         """
         out: dict[str, tuple[bool, float, str, bool | None, str]] = {}
         if not items:
             return out
-        net_by_id = {i.get("requirement_id", ""): i.get("net_name", "") for i in items}
-        payload = {"items": items}
+        batches = [
+            items[start : start + self.review_batch_size]
+            for start in range(0, len(items), self.review_batch_size)
+        ]
+        done = 0
+        for batch in batches:
+            self._review_function_batch(batch, out)
+            done += len(batch)
+            if progress:
+                progress(f"功能名复核完成：{done}/{len(items)}", done / len(items))
+        return out
+
+    def review_failure(self, requirement_id: str) -> str:
+        """某个条目复核失败的具体原因（没有则空串）。"""
+        return self._review_failures.get(requirement_id, "")
+
+    def _review_function_batch(
+        self,
+        batch: list[dict[str, Any]],
+        out: dict[str, tuple[bool, float, str, bool | None, str]],
+    ) -> None:
+        """送一批做功能名等效性复核，结论合并进 out。"""
+        payload = {"items": batch}
+        net_by_id = {i.get("requirement_id", ""): i.get("net_name", "") for i in batch}
         self.stats.events.append(
-            f"→ 请求模型判定功能名等效关系 {len(items)} 条"
+            f"→ 请求模型判定功能名等效关系 {len(batch)} 条"
             f"（后端 {self.provider.name}/{self.provider.model_name}）："
             + "、".join(
                 f"{i.get('net_name')}({i.get('excel_function')}↔{i.get('header_function')})"
-                for i in items[:5]
+                for i in batch[:5]
             )
         )
         response = self.provider.complete(
@@ -147,16 +179,23 @@ class LLMOrchestrator:
                 user=self.masker.mask(json.dumps(payload, ensure_ascii=False, indent=2)),
                 json_schema=FUNCTION_JSON_SCHEMA,
                 temperature=0.0,
-                max_tokens=2048,
+                max_tokens=self.review_max_tokens,
             )
         )
         self._absorb(response)
-        if response.error or not isinstance(response.parsed, dict):
-            return out
+        if response.error:
+            self._mark_review_failed(net_by_id, f"模型调用失败：{response.error[:180]}")
+            return
+        if not isinstance(response.parsed, dict):
+            self._mark_review_failed(net_by_id, self._describe_bad_output(response))
+            return
         try:
             parsed = LlmFunctionResponse.model_validate(response.parsed)
-        except Exception:  # noqa: BLE001
-            return out
+        except Exception as exc:  # noqa: BLE001
+            self._mark_review_failed(
+                net_by_id, f"模型输出结构校验失败：{str(exc)[:180]}"
+            )
+            return
         for item in parsed.results:
             out[item.requirement_id] = (
                 item.equivalent,
@@ -174,9 +213,34 @@ class LLMOrchestrator:
                 f"{'等效' if item.equivalent else '不等效'}{elec}，"
                 f"置信度 {item.confidence:.2f} —— {item.reason}"
             )
-        if progress:
-            progress(f"功能名复核完成：{len(out)}/{len(items)}", 1.0)
-        return out
+        missing = [rid for rid in net_by_id if rid not in out]
+        if missing:
+            reason = f"模型未对 {'、'.join(missing)} 给出结论"
+            for rid in missing:
+                self._review_failures[rid] = reason
+            self._note_failure(reason)
+
+    def _describe_bad_output(self, response) -> str:
+        """说明模型为什么没给出可解析的结论。"""
+        finish = str(getattr(response, "finish_reason", "") or "").strip()
+        if finish == "length":
+            return (
+                f"模型输出被 max_tokens={self.review_max_tokens} 截断"
+                "（finish_reason=length），未产出 JSON 结论"
+            )
+        if finish:
+            return f"模型输出未完成（finish_reason={finish}），未产出 JSON 结论"
+        return "模型输出无法解析为 JSON 结论"
+
+    def _mark_review_failed(self, net_by_id: dict[str, str], reason: str) -> None:
+        """记录本批失败原因（既进日志也进统计，便于界面显示真实原因）。"""
+        for rid in net_by_id:
+            self._review_failures[rid] = reason
+        self._note_failure(reason)
+
+    def _note_failure(self, reason: str) -> None:
+        self.stats.messages.append(reason[:200])
+        self.stats.events.append(f"✗ {reason[:300]}")
 
     def map_symbols(
         self,

@@ -36,6 +36,9 @@ class LLMResponse:
     latency_ms: int = 0
     raw: dict[str, Any] = field(default_factory=dict)
     error: str = ""
+    # 结束原因：stop / length(被 max_tokens 截断) / content_filter …
+    # 推理模型常在思考阶段就把预算用光，此时 finish_reason=length
+    finish_reason: str = ""
 
 
 class LLMProvider(abc.ABC):

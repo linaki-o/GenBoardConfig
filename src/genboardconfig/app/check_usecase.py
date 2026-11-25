@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from ..domain.hsi import HsiEngine, parse_chip_pin
@@ -27,6 +28,9 @@ from ..infra.cconfig.parser import CConfigParser
 from ..infra.excel.reader import ExcelParser
 from ..infra.llm.orchestrator import LLMOrchestrator
 from .context import ProgressFn, Session
+
+# 送模型的可选功能清单里的噪声：测试脚（TEST12B_OUT3…）对等效性判定无意义
+OPTION_NOISE = re.compile(r"^TEST.*_OUT\d+$", re.IGNORECASE)
 
 
 class CheckUseCase:
@@ -187,7 +191,7 @@ class CheckUseCase:
                     "excel_gpio_type": engine.gpio_category(req),
                     # Excel D 列「Description/ Function」：该引脚可复用的功能描述
                     "excel_description": engine.description_of(req),
-                    "options": list(entry.members)[:20],
+                    "options": self._useful_options(entry.members),
                 }
             )
             index[rid] = attr
@@ -202,7 +206,7 @@ class CheckUseCase:
         for rid, attr in index.items():
             verdict = verdicts.get(rid)
             if verdict is None:
-                attr.notes += "；" + self._llm_failure_note()
+                attr.notes += "；" + self._llm_failure_note(rid)
                 continue
             equivalent, confidence, reason, electrical, electrical_reason = verdict
             attr.llm_equivalent = equivalent
@@ -347,14 +351,31 @@ class CheckUseCase:
             return default
         return float(self.settings.get("check.llm_confidence_threshold", default))
 
-    def _llm_failure_note(self) -> str:
-        """模型未给出结论时，说明原因（调用失败 / 输出非法等）。"""
+    @staticmethod
+    def _useful_options(members: list[str], limit: int = 12) -> list[str]:
+        """可选功能清单：去掉 TESTxxB_OUT* 之类测试脚，只留真正能复用的功能。
+
+        这些测试脚会显著拉长模型输入与推理长度，却对功能等效性判定毫无帮助。
+        """
+        out = [m for m in (members or []) if m and not OPTION_NOISE.match(m)]
+        return out[:limit]
+
+    def _llm_failure_note(self, requirement_id: str = "") -> str:
+        """模型未给出结论时，说明原因（调用失败 / 输出被截断 / 漏判等）。"""
+        rid = f"{requirement_id} " if requirement_id else ""
+        detail = ""
+        if self.orchestrator is not None:
+            getter = getattr(self.orchestrator, "review_failure", None)
+            if callable(getter):
+                detail = getter(requirement_id)
+        if detail:
+            return f"{rid}模型未给出结论，需人工确认：{detail[:160]}"
         if self.orchestrator and self.orchestrator.stats.messages:
             return (
-                "模型调用失败，未能复核，需人工确认："
+                f"{rid}模型调用失败，未能复核，需人工确认："
                 f"{self.orchestrator.stats.messages[-1][:160]}"
             )
-        return "模型未给出结论，需人工确认"
+        return f"{rid}模型未给出结论，需人工确认"
 
     @staticmethod
     def _plan_profile(res) -> None:

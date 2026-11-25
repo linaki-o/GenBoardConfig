@@ -78,7 +78,7 @@ def build_provider(settings: Settings) -> LLMProvider:
             base_url=settings.get("llm.base_url", ""),
             api_key=resolve_api_key(settings),
             model=settings.get("llm.model", ""),
-            timeout=float(settings.get("llm.timeout_seconds", 60)),
+            timeout=float(settings.get("llm.timeout_seconds", 180)),
             max_retries=int(settings.get("llm.max_retries", 3)),
             use_structured_output=bool(settings.get("llm.use_structured_output", True)),
         )
@@ -97,6 +97,8 @@ def build_orchestrator(settings: Settings) -> LLMOrchestrator:
         masker=masker,
         temperature=float(settings.get("llm.temperature", 0.0)),
         batch_size=int(settings.get("llm.max_batch_size", 20)),
+        review_batch_size=int(settings.get("llm.review_batch_size", 3)),
+        review_max_tokens=int(settings.get("llm.review_max_tokens", 8192)),
     )
 
 

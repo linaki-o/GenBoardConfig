@@ -103,6 +103,15 @@ class SettingsDialog(QDialog):
         self.batch.setRange(1, 200)
         self.batch.setValue(int(settings.get("llm.max_batch_size", 20)))
         form.addRow("每批条数", self.batch)
+        self.timeout = QSpinBox()
+        self.timeout.setRange(10, 600)
+        self.timeout.setSuffix(" 秒")
+        self.timeout.setValue(int(settings.get("llm.timeout_seconds", 180)))
+        form.addRow("请求超时", self.timeout)
+        self.review_batch = QSpinBox()
+        self.review_batch.setRange(1, 20)
+        self.review_batch.setValue(int(settings.get("llm.review_batch_size", 3)))
+        form.addRow("功能名判定每批条数", self.review_batch)
         self.retries = QSpinBox()
         self.retries.setRange(0, 10)
         self.retries.setValue(int(settings.get("llm.max_retries", 3)))
@@ -191,7 +200,7 @@ class SettingsDialog(QDialog):
                 base_url=base_url,
                 api_key=key,
                 model=model,
-                timeout=float(self.settings.get("llm.timeout_seconds", 60)),
+                timeout=float(self.settings.get("llm.timeout_seconds", 180)),
                 max_retries=1,
             )
             response = provider.complete(
@@ -229,6 +238,8 @@ class SettingsDialog(QDialog):
             QMessageBox.warning(self, "参数错误", "temperature / 置信度阈值必须是数字")
             return
         s.set("llm.max_batch_size", self.batch.value())
+        s.set("llm.timeout_seconds", self.timeout.value())
+        s.set("llm.review_batch_size", self.review_batch.value())
         s.set("llm.max_retries", self.retries.value())
         s.set("llm.use_structured_output", self.structured.isChecked())
         s.set(

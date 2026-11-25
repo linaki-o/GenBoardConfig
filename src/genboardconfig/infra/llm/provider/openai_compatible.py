@@ -72,11 +72,12 @@ class OpenAICompatibleProvider(LLMProvider):
                     time.sleep(min(2 ** attempt, 8))
                     continue
                 data = resp.json()
-                content = data["choices"][0]["message"]["content"]
+                choice = (data.get("choices") or [{}])[0]
+                content = (choice.get("message") or {}).get("content")
                 usage = data.get("usage", {}) or {}
                 return LLMResponse(
-                    content=content,
-                    parsed=self._safe_json(content),
+                    content=content or "",
+                    parsed=self._safe_json(content or ""),
                     usage=TokenUsage(
                         prompt_tokens=usage.get("prompt_tokens", 0),
                         completion_tokens=usage.get("completion_tokens", 0),
@@ -89,24 +90,41 @@ class OpenAICompatibleProvider(LLMProvider):
                     ),
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     raw=data,
+                    finish_reason=str(choice.get("finish_reason") or ""),
                 )
             except httpx.LocalProtocolError as exc:
                 # 请求头非法（如密钥带换行）：重试无意义，直接报错
                 last_error = redact(f"{type(exc).__name__}: {exc}", self.api_key)
                 break
+            except httpx.TimeoutException as exc:
+                # 推理模型生成慢，单次请求可能撞上超时上限（如 8192 token 的思考）
+                last_error = redact(
+                    f"请求超时（单次上限 {self.timeout:g}s，"
+                    f"已尝试 {attempt + 1}/{self.max_retries} 次）："
+                    f"{type(exc).__name__}: {exc}",
+                    self.api_key,
+                )
+                time.sleep(min(2 ** attempt, 8))
             except Exception as exc:  # noqa: BLE001
                 last_error = redact(f"{type(exc).__name__}: {exc}", self.api_key)
                 time.sleep(min(2 ** attempt, 8))
         return LLMResponse(error=last_error or "unknown error")
 
     @staticmethod
-    def _safe_json(content: str):
+    def _strip_think(text: str) -> str:
+        """剥掉推理模型的思考块（<think>…</think>，含未闭合的情况）。"""
+        text = re.sub(r"<think>.*?</think>", " ", text, flags=re.S | re.I)
+        return re.sub(r"<think>.*", " ", text, flags=re.S | re.I)
+
+    @classmethod
+    def _safe_json(cls, content: str):
         if not content:
             return None
-        text = content.strip()
-        fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.S)
-        if fence:
-            text = fence.group(1)
+        text = cls._strip_think(content).strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
+        if text.endswith("```"):
+            text = text[:-3].strip()
         try:
             return json.loads(text)
         except json.JSONDecodeError:
