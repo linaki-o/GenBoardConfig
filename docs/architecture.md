@@ -188,7 +188,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A["用户勾选变更项"] --> B["Planner 生成 ChangePlan<br/>类型: set_macro / set_struct_field / set_array_item"]
+    A["结论为「不一致」的行（默认全部纳入）"] --> B["Planner 生成 ChangePlan<br/>类型: set_macro / set_struct_field / set_array_item"]
     B --> C{"落点可精确定位?"}
     C -- 否 --> D["标记 人工处理建议<br/>不生成修改"]
     C -- 是 --> E["生成 unified diff 并预览"]
@@ -431,7 +431,7 @@ Windows 10/11
 | 用例编排 | 已实现 | `app/check_usecase.py`（通用/档案双路）、`app/apply_usecase.py`、`app/report_usecase.py` |
 | GUI | 已实现 | `ui/main_window.py` 等（档案自动识别、逐属性列、属性详情表） |
 
-已实现的纵切闭环：**Excel + `.h` → 档案识别 → 行过滤 → 解析（位表逐位展开）→ 逐属性确定性核对 → 残余项模型复核 → 逐属性结论 → 勾选 → diff 预览 → 备份写回（位内改写）→ 结构校验 + 逐属性复检 → 失败回滚 → 报告导出**。
+已实现的纵切闭环：**Excel + `.h` → 档案识别 → 行过滤 → 解析（位表逐位展开）→ 逐属性确定性核对 → 残余项模型复核 → 逐属性结论 → 不一致行自动纳入 → diff 预览 → 备份写回（位内改写）→ 结构校验 + 逐属性复检 → 失败回滚 → 报告导出**。
 
 ---
 

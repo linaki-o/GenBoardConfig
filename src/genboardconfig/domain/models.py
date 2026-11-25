@@ -156,7 +156,6 @@ class MatchResult(BaseModel):
     proposed_change: ProposedChange = Field(default_factory=ProposedChange)
     source: Source = Source.DETERMINISTIC
     notes: str = ""
-    selected: bool = True            # 是否纳入修改
     candidate_count: int = 0
     # —— 档案模式：逐属性结论 ——
     attribute_results: list["AttributeResult"] = Field(default_factory=list)

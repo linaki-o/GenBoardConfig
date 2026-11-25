@@ -9,7 +9,6 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
-    QCheckBox,
     QComboBox,
     QDockWidget,
     QFileDialog,
@@ -79,12 +78,10 @@ class ResultFilterProxy(QSortFilterProxyModel):
         super().__init__(parent)
         self.status = ""
         self.keyword = ""
-        self.only_changeable = False
 
-    def set_filters(self, status: str = "", keyword: str = "", only_changeable: bool = False) -> None:
+    def set_filters(self, status: str = "", keyword: str = "") -> None:
         self.status = status
         self.keyword = keyword.strip().lower()
-        self.only_changeable = only_changeable
         self.invalidateFilter()
 
     def filterAcceptsRow(self, source_row: int, source_parent) -> bool:  # noqa: N802
@@ -94,8 +91,6 @@ class ResultFilterProxy(QSortFilterProxyModel):
         row = model.rows()[source_row]
         result: MatchResult = row.result
         if self.status and result.status.value != self.status:
-            return False
-        if self.only_changeable and result.proposed_change.type.value == "none":
             return False
         if self.keyword:
             haystack = " ".join(
@@ -195,10 +190,6 @@ class MainWindow(QMainWindow):
         self.btn_stop.clicked.connect(self._stop)
         row.addWidget(self.btn_stop)
 
-        self.btn_preview = QPushButton("预览修改")
-        self.btn_preview.clicked.connect(self._preview_changes)
-        row.addWidget(self.btn_preview)
-
         self.btn_apply = QPushButton("应用修改")
         self.btn_apply.setObjectName("dangerBtn")
         self.btn_apply.clicked.connect(self._apply_changes)
@@ -207,10 +198,6 @@ class MainWindow(QMainWindow):
         self.btn_report = QPushButton("导出报告")
         self.btn_report.clicked.connect(self._export_report)
         row.addWidget(self.btn_report)
-
-        self.btn_settings = QPushButton("设置")
-        self.btn_settings.clicked.connect(self._open_settings)
-        row.addWidget(self.btn_settings)
         return bar
 
     def _build_center(self) -> QWidget:
@@ -235,18 +222,6 @@ class MainWindow(QMainWindow):
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.textChanged.connect(self._apply_filters)
         bar.addWidget(self.search_edit, 2)
-
-        self.only_changeable = QCheckBox("仅显示可自动修改")
-        self.only_changeable.stateChanged.connect(self._apply_filters)
-        bar.addWidget(self.only_changeable)
-
-        self.btn_select_all = QPushButton("全选可修改")
-        self.btn_select_all.clicked.connect(self._select_all_changeable)
-        bar.addWidget(self.btn_select_all)
-
-        self.btn_clear = QPushButton("清空选择")
-        self.btn_clear.clicked.connect(self._clear_selection)
-        bar.addWidget(self.btn_clear)
         v.addLayout(bar)
 
         self.result_model = ResultTableModel(self)
@@ -265,11 +240,11 @@ class MainWindow(QMainWindow):
         self.table.selectionModel().selectionChanged.connect(self._on_selection)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(13, QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(12, QHeaderView.Stretch)
         for col, width in {
-            0: 40, 2: 70, 3: 48, 4: 110, 5: 56, 6: 90,
-            7: 200, 8: 90, 9: 110, 10: 64, 11: 56, 12: 70,
+            1: 70, 2: 48, 3: 110, 4: 56, 5: 90,
+            6: 200, 7: 90, 8: 110, 9: 64, 10: 56, 11: 70,
         }.items():
             self.table.setColumnWidth(col, width)
         v.addWidget(self.table, 1)
@@ -417,8 +392,10 @@ class MainWindow(QMainWindow):
         menu = self.menuBar().addMenu("文件")
         menu.addAction(act_check)
         menu.addAction(act_report)
-        menu.addSeparator()
-        menu.addAction(act_settings)
+
+        # 设置放在最上方的导航栏里
+        settings_menu = self.menuBar().addMenu("设置")
+        settings_menu.addAction(act_settings)
 
         view_menu = self.menuBar().addMenu("视图")
         self.act_left_dock = QAction("核对概览", self)
@@ -536,7 +513,6 @@ class MainWindow(QMainWindow):
         self.btn_check.setEnabled(ready and (self.worker is None))
         self.btn_stop.setEnabled(self.worker is not None)
         has_result = bool(self.session.check_result.results)
-        self.btn_preview.setEnabled(has_result and self.worker is None)
         self.btn_apply.setEnabled(has_result and self.worker is None)
         self.btn_report.setEnabled(has_result)
 
@@ -643,12 +619,11 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self._update_actions()
 
-    # —— 过滤与选择 ——
+    # —— 过滤 ——
     def _apply_filters(self) -> None:
         self.proxy.set_filters(
             self.status_combo.currentData() or "",
             self.search_edit.text(),
-            self.only_changeable.isChecked(),
         )
 
     def _filter_by_status(self, status: str) -> None:
@@ -660,25 +635,6 @@ class MainWindow(QMainWindow):
             idx = self.status_combo.findData(status)
             if idx >= 0:
                 self.status_combo.setCurrentIndex(idx)
-
-    def _selected_results(self) -> list[MatchResult]:
-        out = []
-        for row in self.result_model.rows():
-            if row.result.selected:
-                out.append(row.result)
-        return out
-
-    def _select_all_changeable(self) -> None:
-        for row in self.result_model.rows():
-            row.result.selected = row.result.proposed_change.type.value != "none"
-        self.result_model.set_result(self.session.check_result)
-        self._apply_filters()
-
-    def _clear_selection(self) -> None:
-        for row in self.result_model.rows():
-            row.result.selected = False
-        self.result_model.set_result(self.session.check_result)
-        self._apply_filters()
 
     def _on_compare_row(self, row: int) -> None:
         """并排对比视图选中某行 → 右侧详情同步显示。"""
@@ -709,18 +665,18 @@ class MainWindow(QMainWindow):
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
         if self.result_model.profile_mode:
-            header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
             header.setSectionResizeMode(self.result_model.columnCount() - 1, QHeaderView.Stretch)
-            for col, width in {0: 40, 2: 150, 3: 120, 4: 170}.items():
+            for col, width in {1: 150, 2: 120, 3: 170}.items():
                 self.table.setColumnWidth(col, width)
-            for col in range(5, self.result_model.columnCount() - 1):
+            for col in range(4, self.result_model.columnCount() - 1):
                 self.table.setColumnWidth(col, 150)
         else:
-            header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(13, QHeaderView.Stretch)
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(12, QHeaderView.Stretch)
             for col, width in {
-                0: 40, 2: 70, 3: 48, 4: 110, 5: 56, 6: 90,
-                7: 200, 8: 90, 9: 110, 10: 64, 11: 56, 12: 70,
+                1: 70, 2: 48, 3: 110, 4: 56, 5: 90,
+                6: 200, 7: 90, 8: 110, 9: 64, 10: 56, 11: 70,
             }.items():
                 self.table.setColumnWidth(col, width)
 
@@ -881,38 +837,25 @@ class MainWindow(QMainWindow):
         QApplication.clipboard().setText(text)
 
     # —— 修改 ——
-    def _preview_changes(self) -> None:
-        if not self.session.check_result.results:
-            return
-        selected = {r.requirement_id for r in self._selected_results()}
-        if not selected:
-            QMessageBox.information(
-                self, "提示", "请在「应用」列勾选要修改的行（可点「全选可修改」）"
-            )
-            return
-        outcome = self.apply_usecase.preview(self.session, selected)
-        self.preview = outcome
-        header = (
-            f"新增 {outcome.added} 行 / 删除 {outcome.removed} 行"
-            + (f"；跳过 {len(outcome.skipped)} 条" if outcome.skipped else "")
-        )
-        self.diff_view.set_diff(outcome.diff, header)
-        self.tabs.setCurrentIndex(1)
-        if outcome.skipped:
-            self._log("以下条目无法自动修改：\n  " + "\n  ".join(outcome.skipped))
-        self._log(f"生成预览：{header}")
+    def _mismatch_results(self) -> list[MatchResult]:
+        """待修改的行：结论为「不一致」的行默认都要修改。"""
+        return [
+            res
+            for res in self.session.check_result.results
+            if res.status == CheckStatus.MISMATCH.value
+        ]
 
     def _apply_changes(self) -> None:
         if not self.session.check_result.results:
             return
-        selected = {r.requirement_id for r in self._selected_results()}
-        if not selected:
-            QMessageBox.information(self, "提示", "请先勾选要修改的行")
+        targets = self._mismatch_results()
+        if not targets:
+            QMessageBox.information(self, "提示", "没有结论为「不一致」的行，无需修改")
             return
         confirm = QMessageBox.question(
             self,
             "确认写回",
-            f"即将把 {len(selected)} 处修改写回：\n{self.session.c_path}\n\n"
+            f"即将把 {len(targets)} 处「不一致」的行写回：\n{self.session.c_path}\n\n"
             "写回前会自动备份，写回后执行结构与语义复检，失败将自动回滚。是否继续？",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
@@ -922,7 +865,7 @@ class MainWindow(QMainWindow):
 
         def task(progress):
             progress("写回中 ...", 0.2)
-            outcome = self.apply_usecase.apply(self.session, selected)
+            outcome = self.apply_usecase.apply(self.session)
             progress("完成", 1.0)
             return outcome
 
@@ -938,9 +881,12 @@ class MainWindow(QMainWindow):
     def _on_apply_done(self, outcome) -> None:
         if not isinstance(outcome, ApplyOutcome):
             return
+        self.preview = outcome
         self._log(outcome.message)
         if outcome.backup_path:
             self._log(f"备份文件：{outcome.backup_path}")
+        if outcome.skipped:
+            self._log("以下条目无法自动修改：\n  " + "\n  ".join(outcome.skipped))
         if outcome.semantic:
             for item in outcome.semantic.fixed:
                 self._log(f"  已修复：{item}")
@@ -949,6 +895,7 @@ class MainWindow(QMainWindow):
             for item in outcome.semantic.introduced:
                 self._log(f"  新增差异：{item}")
         self.diff_view.set_diff(outcome.diff, outcome.message)
+        self.tabs.setCurrentIndex(1)
         if outcome.rolled_back:
             QMessageBox.warning(self, "已回滚", outcome.message)
         else:

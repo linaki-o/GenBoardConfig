@@ -56,10 +56,8 @@ def aggregate_attribute_changes(result: MatchResult) -> None:
     ]
     if changes:
         result.proposed_change = changes[0]
-        result.selected = True
     elif blocked:
         result.proposed_change = blocked[0]
-        result.selected = False
         result.notes += "；" + blocked[0].reason
     else:
         result.proposed_change.type = ChangeType.NONE

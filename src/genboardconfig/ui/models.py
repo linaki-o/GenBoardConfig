@@ -34,10 +34,10 @@ STATUS_BG = {
 }
 
 GENERIC_HEADERS = [
-    "应用", "状态", "Sheet", "行", "管脚", "GPIO", "功能",
+    "状态", "Sheet", "行", "管脚", "GPIO", "功能",
     "配置项", "期望值", "当前值", "置信度", "来源", "依据", "说明",
 ]
-PROFILE_HEADERS = ["应用", "状态", "网络名", "引脚", "占用信号"]
+PROFILE_HEADERS = ["状态", "网络名", "引脚", "占用信号"]
 
 
 class ResultTableModel(QAbstractTableModel):
@@ -72,15 +72,13 @@ class ResultTableModel(QAbstractTableModel):
         col = index.column()
 
         if role == Qt.DisplayRole:
-            if col == 0:
-                return Qt.Checked if res.selected else Qt.Unchecked
             return self._display(row, col)
         if role == Qt.TextAlignmentRole:
-            if col in (0, 3) or (self._profile_mode and col == 1):
+            if col in (0, 2):
                 return int(Qt.AlignCenter)
             return int(Qt.AlignLeft | Qt.AlignVCenter)
         if role == Qt.ForegroundRole:
-            if col == 1:
+            if col == 0:
                 return QBrush(QColor(STATUS_COLORS.get(res.status.value, "#0f172a")))
             if self._profile_mode and self._attr_col_start <= col < self._attr_col_end:
                 attr = self._attr_at(row, col)
@@ -88,11 +86,11 @@ class ResultTableModel(QAbstractTableModel):
                     return QBrush(QColor("#dc2626"))
                 if attr is not None and attr.status == CheckStatus.AMBIGUOUS.value:
                     return QBrush(QColor("#ca8a04"))
-            elif not self._profile_mode and col == 9 and res.status == CheckStatus.MISMATCH.value:
+            elif not self._profile_mode and col == 8 and res.status == CheckStatus.MISMATCH.value:
                 return QBrush(QColor("#dc2626"))
-        if role == Qt.BackgroundRole and col == 1:
+        if role == Qt.BackgroundRole and col == 0:
             return QBrush(QColor(STATUS_BG.get(res.status.value, "#ffffff")))
-        if role == Qt.FontRole and (col == 4 if self._profile_mode else col == 7):
+        if role == Qt.FontRole and (col == 3 if self._profile_mode else col == 6):
             return QFont("Consolas")
         if role == Qt.ToolTipRole:
             return self._tooltip(row)
@@ -101,18 +99,7 @@ class ResultTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex):  # noqa: N802
         if not index.isValid():
             return Qt.NoItemFlags
-        base = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-        if index.column() == 0:
-            return base | Qt.ItemIsUserCheckable
-        return base
-
-    def setData(self, index: QModelIndex, value, role=Qt.EditRole):  # noqa: N802
-        if not index.isValid() or role != Qt.CheckStateRole or index.column() != 0:
-            return False
-        res = self._rows[index.row()].result
-        res.selected = Qt.CheckState(value) == Qt.Checked
-        self.dataChanged.emit(index, index, [Qt.CheckStateRole])
-        return True
+        return Qt.ItemIsEnabled | Qt.ItemIsSelectable
 
     # ---------- 数据 ----------
     def set_result(self, result: CheckResult | None) -> None:
@@ -127,9 +114,14 @@ class ResultTableModel(QAbstractTableModel):
                 self._rows.append(_Row(res, reqs.get(res.requirement_id)))
             if self._rows and self._rows[0].result.attribute_results:
                 self._profile_mode = True
-                self._attr_labels = [
-                    a.label for a in self._rows[0].result.attribute_results
-                ]
+                # 属性标签取所有行的并集：个别行缺少「功能名」属性时
+                # （如 Excel 未标 (App)），不能让整张表少一列
+                labels: list[str] = []
+                for row in self._rows:
+                    for attr in row.result.attribute_results:
+                        if attr.label and attr.label not in labels:
+                            labels.append(attr.label)
+                self._attr_labels = labels
                 self._headers = PROFILE_HEADERS + self._attr_labels + ["说明"]
         if not self._profile_mode:
             self._headers = list(GENERIC_HEADERS)
@@ -161,13 +153,15 @@ class ResultTableModel(QAbstractTableModel):
     def _attr_col_end(self) -> int:
         return len(PROFILE_HEADERS) + len(self._attr_labels)
 
-    @staticmethod
-    def _attr_at(row, col: int) -> AttributeResult | None:
-        if not row.result.attribute_results:
-            return None
+    def _attr_at(self, row, col: int) -> AttributeResult | None:
+        """按列标题（属性标签）定位属性，个别行缺该属性时返回 None。"""
         idx = col - len(PROFILE_HEADERS)
-        if 0 <= idx < len(row.result.attribute_results):
-            return row.result.attribute_results[idx]
+        if not (0 <= idx < len(self._attr_labels)):
+            return None
+        label = self._attr_labels[idx]
+        for attr in row.result.attribute_results:
+            if attr.label == label:
+                return attr
         return None
 
     # ---------- 展示 ----------
@@ -175,13 +169,13 @@ class ResultTableModel(QAbstractTableModel):
         res = row.result
         req = row.req
         if self._profile_mode:
-            if col == 1:
+            if col == 0:
                 return STATUS_LABELS.get(res.status.value, res.status.value)
-            if col == 2:
+            if col == 1:
                 return req.net_name or req.config_key if req else ""
-            if col == 3:
+            if col == 2:
                 return req.pin_name_raw if req else ""
-            if col == 4:
+            if col == 3:
                 return "、".join(res.signals[:3]) or "-"
             if col == len(self._headers) - 1:
                 return res.notes
@@ -197,33 +191,33 @@ class ResultTableModel(QAbstractTableModel):
             return f"{attr.expected} → {attr.actual}"
 
         result = res
-        if col == 1:
+        if col == 0:
             return STATUS_LABELS.get(result.status.value, result.status.value)
-        if col == 2:
+        if col == 1:
             return req.sheet if req else ""
-        if col == 3:
+        if col == 2:
             return req.row_no if req else ""
-        if col == 4:
+        if col == 3:
             return req.pin_name_raw if req else ""
-        if col == 5:
+        if col == 4:
             return req.gpio_num if req and req.gpio_num is not None else ""
-        if col == 6:
+        if col == 5:
             return req.function_name if req else ""
-        if col == 7:
+        if col == 6:
             return req.config_key if req else ""
-        if col == 8:
+        if col == 7:
             return result.expected_value
-        if col == 9:
+        if col == 8:
             return result.current_value
-        if col == 10:
+        if col == 9:
             return f"{result.confidence:.2f}"
-        if col == 11:
+        if col == 10:
             return {"deterministic": "规则", "llm": "模型", "human": "人工"}.get(
                 result.source.value, result.source.value
             )
-        if col == 12:
+        if col == 11:
             return f"L{result.evidence[0].line}" if result.evidence else ""
-        if col == 13:
+        if col == 12:
             return result.notes
         return ""
 

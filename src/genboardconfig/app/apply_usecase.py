@@ -40,13 +40,13 @@ class ApplyUseCase:
         ChangeType.SET_PORT_BIT,
     }
 
-    def build_edits(self, session: Session, selected_ids: set[str]) -> tuple[list[TextEdit], list[str]]:
+    def build_edits(self, session: Session) -> tuple[list[TextEdit], list[str]]:
         entries_by_id = session.entries_by_id()
         edits: list[TextEdit] = []
         skipped: list[str] = []
-        seen_lines: set[tuple[int, int]] = set()
+        seen_lines: dict[tuple[int, int], str] = {}
         for res in session.check_result.results:
-            if res.requirement_id not in selected_ids:
+            if res.status != CheckStatus.MISMATCH.value:
                 continue
             changes = [c for c in self._collect_changes(res) if c is not None]
             if not changes:
@@ -70,10 +70,14 @@ class ApplyUseCase:
                     )
                     continue
                 key = (entry.line, entry.value_col)
-                if key in seen_lines:
-                    skipped.append(f"{res.requirement_id}: 与其它变更落点冲突，跳过")
+                owner = seen_lines.get(key)
+                if owner is not None:
+                    if owner == res.requirement_id:
+                        # 同一条目的行级 + 属性级变更指向同一处：按首条处理
+                        continue
+                    skipped.append(f"{res.requirement_id}: 与 {owner} 的变更落点冲突，跳过")
                     continue
-                seen_lines.add(key)
+                seen_lines[key] = res.requirement_id
                 edits.append(
                     TextEdit(
                         line=entry.line,
@@ -95,10 +99,10 @@ class ApplyUseCase:
                 changes.append(attr.change)
         return changes
 
-    def preview(self, session: Session, selected_ids: set[str]) -> ApplyOutcome:
+    def preview(self, session: Session) -> ApplyOutcome:
         if session.c_parse is None:
             return ApplyOutcome(message="尚未解析 C 文件")
-        edits, skipped = self.build_edits(session, selected_ids)
+        edits, skipped = self.build_edits(session)
         if not edits:
             return ApplyOutcome(message="没有可自动应用的修改", skipped=skipped)
         try:
@@ -120,13 +124,12 @@ class ApplyUseCase:
     def apply(
         self,
         session: Session,
-        selected_ids: set[str],
         overwrite: bool = True,
         run_semantic: bool = True,
     ) -> ApplyOutcome:
         if session.c_parse is None:
             return ApplyOutcome(message="尚未解析 C 文件")
-        outcome = self.preview(session, selected_ids)
+        outcome = self.preview(session)
         if not outcome.new_text:
             return outcome
 

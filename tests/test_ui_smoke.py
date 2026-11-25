@@ -16,9 +16,11 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pytest  # noqa: E402
+from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from genboardconfig.app.service_factory import profile_for_series  # noqa: E402
+from genboardconfig.domain.models import CheckResult, CheckSummary  # noqa: E402
 from genboardconfig.infra.settings import load_settings  # noqa: E402
 from genboardconfig.ui.main_window import GOLDEN_RATIO, MainWindow  # noqa: E402
 from genboardconfig.ui.settings_dialog import SettingsDialog  # noqa: E402
@@ -79,6 +81,71 @@ def test_center_and_detail_panes_use_golden_ratio():
     assert right > 0
     assert center / right == pytest.approx(GOLDEN_RATIO, abs=0.05)
     win.close()
+
+
+def test_result_table_has_no_apply_column():
+    """「应用」列已删除，核对明细表第一列是「状态」。"""
+    from genboardconfig.domain.models import CheckStatus, MatchResult
+    from genboardconfig.ui.models import ResultTableModel
+
+    _app()
+    res = MatchResult(requirement_id="R1", status=CheckStatus.MISMATCH)
+    model = ResultTableModel()
+    model.set_result(
+        CheckResult(requirements=[], entries=[], results=[res], summary=CheckSummary(total=1))
+    )
+    assert model.headerData(0, Qt.Horizontal) == "状态"
+    assert model.data(model.index(0, 0), Qt.DisplayRole) == "不一致"
+    assert "应用" not in model._headers
+
+
+def test_apply_targets_mismatch_rows_only():
+    """「不一致」的行默认都要修改；其余行不进入写回集合。"""
+    from types import SimpleNamespace
+
+    from genboardconfig.app.apply_usecase import ApplyUseCase
+    from genboardconfig.domain.models import (
+        ChangeType,
+        CheckStatus,
+        ConfigEntry,
+        EntryKind,
+        MatchResult,
+        ProposedChange,
+    )
+
+    entry = ConfigEntry(
+        id="E1",
+        kind=EntryKind.MACRO_FUNC,
+        key="_PIN_PB6",
+        value_raw="GPI",
+        line=10,
+        value_col=12,
+        value_len=3,
+    )
+
+    def _res(rid, status):
+        res = MatchResult(requirement_id=rid, status=status)
+        res.proposed_change = ProposedChange(
+            type=ChangeType.SET_MACRO,
+            target="E1",
+            old_value="GPI",
+            new_value="GPO_PP",
+            reason="期望 GPO_PP",
+        )
+        return res
+
+    results = [
+        _res("R1", CheckStatus.MISMATCH),
+        _res("R2", CheckStatus.MATCH),
+        _res("R3", CheckStatus.AMBIGUOUS),
+    ]
+    session = SimpleNamespace(
+        check_result=SimpleNamespace(results=results),
+        entries_by_id=lambda: {"E1": entry},
+    )
+    edits, skipped = ApplyUseCase().build_edits(session)
+    assert [e.new_value for e in edits] == ["GPO_PP"]      # 只有 R1 被写回
+    assert all(not s.startswith(("R2", "R3")) for s in skipped)
 
 
 def test_settings_dialog_constructs_without_profile():

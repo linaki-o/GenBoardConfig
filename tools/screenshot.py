@@ -65,8 +65,7 @@ def main() -> int:
         win.session, progress=lambda m, p: None, use_llm=False
     )
     win._on_check_done(result)
-    win._select_all_changeable()
-    if win._selected_results():
+    if win._mismatch_results():
         win._preview_changes()
 
     def grab():
