@@ -83,9 +83,12 @@ typedef enum
 
 | 情形 | 处理 |
 |---|---|
+| Excel C 列**没有 (App) 标记** | **不判功能名**：C 列第一个功能只是「可选功能之一」，并非原理图指定的复用功能，拿它当期望值会误判；该行只按电气属性（L1）判定 |
 | `.h` 选中**通用 GPIO**，Excel C 列 (App) 是**专用功能名**（如 `HDMI_HPD_4`） | **视为一致**（实现方式不同，电气属性一致即可），备注「以通用 GPIO 实现」 |
 | `.h` 选中**专用功能**，与 Excel (App) 名归一化后相同 | 一致 |
-| `.h` 选中**专用功能**，与 Excel (App) 名不同 | **歧义** → 交大模型判定是否等效（例：`AUX1_CHP` 期望 `SBU2_1`，`.h` 用 `DPRX_AUX_P_1`） |
+| `.h` 选中**专用功能**，与 Excel (App) 名不同 | **歧义** → 交大模型判定是否等效（例：`AUX1_CHP` 期望 `SBU2_0`，`.h` 用 `DPRX_AUX_P_0`） |
+
+> 「功能名」这一列只在 **Excel 明确标了 (App)** 的行出现；未标 (App) 的行该列为空。
 
 交大模型判定时，每条送入模型的输入为：
 
@@ -97,7 +100,19 @@ typedef enum
 | `pad` | `.h` 宏组 | 引脚编号 |
 | `excel_gpio_type` | G 列「GPIO TYPE」 | 电气方向 |
 | `excel_description` | **D 列「Description/ Function」** | 该引脚在原理图上允许的复用功能清单（可为空） |
-| `options` | `.h` 枚举成员 | 该 pad 在配置文件中可选的功能清单 |
+| `excel_output_pin_type` | **H 列「Output PIN 设定类型」** | 输出类别（`Open-Drain Output` / `Push-Pull Output` / `Open-Drain PWM` / `Push-Pull PWM`；NA 等占位值按空处理） |
+| `options` | `.h` 枚举成员 | 该 pad 在配置文件中可选的功能清单（去掉 `TESTxxB_OUT*` 测试脚噪声） |
+
+模型调用约定（`infra/llm/orchestrator.py:review_functions()`）：
+
+| 项 | 取值 | 原因 |
+|---|---|---|
+| 每批条数 | 3（`llm.review_batch_size`） | 推理模型逐条长思考，一次送太多会在产出 JSON 前耗尽输出预算 |
+| `max_tokens` | 8192（`llm.review_max_tokens`） | MiniMax-M3 等推理模型思考阶段就要 2000~5500 token，2048 会直接截断 |
+| 请求超时 | 180 秒（`llm.timeout_seconds`） | 实测同一批 3 条最长要 93 秒（5449 token），60 秒上限会误判为「模型调用失败」 |
+| 思考块处理 | 解析前剥掉 `<think>…</think>` | 推理模型把思考过程与 JSON 混在 `content` 里 |
+| 截断上报 | `finish_reason=length` 时写日志与条目备注 | 否则界面只能显示「模型未给出结论」，看不到真实原因 |
+| 超时上报 | 超时单独提示「请求超时（单次上限 N 秒）」 | 便于区分「模型慢」与「模型出错」 |
 
 ### L3 存在性层
 

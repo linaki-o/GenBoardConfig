@@ -7,6 +7,9 @@
 - `pad`：引脚编号
 - `excel_gpio_type`：Excel 的 GPIO 类别（IN / OUT / SCL / SDA / ADC）
 - `excel_description`：Excel D 列「Description/ Function」——该引脚可复用的功能清单（可能为空）
+- `excel_output_pin_type`：Excel H 列「Output PIN 设定类型」的输出类别
+  （`Open-Drain Output` / `Push-Pull Output` / `Open-Drain PWM` / `Push-Pull PWM`；空表示该行不是输出类或未填）
+  换算到板级配置的通用 GPIO：`Open-Drain*` ↔ `GPO_OD`（开漏），`Push-Pull*` ↔ `GPO_PP`（推挽）
 - `options`：该引脚在配置文件中可选的功能清单
 
 # 判定要点
@@ -17,8 +20,12 @@
 3. `excel_description` 列出该引脚在原理图上允许的复用功能，
    若 `excel_function` 与 `header_function` 都能在其中找到（或互为别名），视为等效；
    若 `header_function` 不在该清单内，说明配置选错了复用功能，判为不等效。
-4. 方向不兼容（Excel 要求输入而配置是输出专用功能，或反之）→ 不等效。
-5. 无法判断时给出低置信度，由人工确认。
+4. `excel_output_pin_type` 非空时（该行要求推挽或开漏输出）：
+   - 配置选 `GPO_PP` 而要求 `Open-Drain*`（或反之）→ 电气不兼容，不等效；
+   - 配置选专用功能时，其电气类别也须与 `Open-Drain*`（开漏）或 `Push-Pull*`（推挽）相符，
+     冲突则不等效。
+5. 方向不兼容（Excel 要求输入而配置是输出专用功能，或反之）→ 不等效。
+6. 无法判断时给出低置信度，由人工确认。
 
 # 输出
 严格按 JSON Schema 输出 `{"results": [{"requirement_id","equivalent","confidence","reason","electrical_match","electrical_reason"}]}`。

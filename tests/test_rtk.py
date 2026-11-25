@@ -124,7 +124,9 @@ def test_norm_and_app_function():
     assert norm_text("CLK (SPI)") == "CLK"
     assert norm_text("EE_WP (H:ON)") == "EE_WP"
     assert app_function("HDMI_HPD_4(App) / HDMI_RX_HPD_4 / DVS") == "HDMI_HPD_4"
-    assert app_function("SBU2_1 / SBU1_1") == "SBU2_1"
+    # 没有 (App) 标记 → 不取第一项（那只是可选功能之一，不是实际功能名）
+    assert app_function("SBU2_1 / SBU1_1") == ""
+    assert app_function("") == ""
 
 
 def test_parser_extracts_define_right_value_span():
@@ -181,6 +183,16 @@ def test_dedicated_function_name_differs_goes_ambiguous():
     assert fn.actual == "DPRX_AUX_P_1"
 
 
+def test_without_app_marker_no_function_name_attribute():
+    """Excel C 列没有 (App) 标记时不判功能名（第一项只是可选功能之一）。"""
+    engine = _engine()
+    req = _req("AUX1_CHP", "IN", "", "DPRX_AUX_P_1 / SBU2_1 / GPIO")
+    result = engine.check([req])[0]
+    assert result.attribute("function_name") is None
+    # 该行仍按电气属性判定，不会因为缺 (App) 而被整体跳过
+    assert result.attribute("elec_type") is not None
+
+
 def test_missing_net_is_not_checked():
     engine = _engine()
     req = _req("NOT_IN_HEADER", "OUT", "Push-Pull Output", "X(App)")
@@ -199,6 +211,19 @@ def test_description_of_returns_excel_d_column():
     assert engine.description_of(_req("AUX1_CHP", "IN", "", "SBU2_1(App)")) == ""
 
 
+def test_output_pin_type_reads_h_column():
+    """H 列「Output PIN 设定类型」的类别；NA 等占位值按空处理。"""
+    engine = _engine()
+    assert engine.output_pin_type(_req("AUX1_CHP", "OUT", "Open-Drain Output", "X(App)")) == (
+        "Open-Drain Output"
+    )
+    assert engine.output_pin_type(_req("AUX1_CHP", "OUT", "Push-Pull Output", "X(App)")) == (
+        "Push-Pull Output"
+    )
+    assert engine.output_pin_type(_req("AUX1_CHP", "IN", "", "X(App)")) == ""
+    assert engine.output_pin_type(_req("AUX1_CHP", "OUT", "NA", "X(App)")) == ""
+
+
 def test_llm_review_payload_carries_excel_d_column():
     """L2 交模型判定时必须带上 Excel D 列数据。"""
     from types import SimpleNamespace
@@ -213,6 +238,9 @@ def test_llm_review_payload_carries_excel_d_column():
         def review_functions(self, items, progress=None):
             self.items = list(items)
             return {}
+
+        def review_failure(self, requirement_id):
+            return ""
 
     engine = _engine()
     req = _req("AUX1_CHP", "IN", "", "SBU2_1(App) / SBU1_1")
@@ -232,6 +260,39 @@ def test_llm_review_payload_carries_excel_d_column():
     assert item["excel_description"] == "DPRX_AUX_P_1/SBU2_1/GPIO"
     assert item["excel_function"] == "SBU2_1"
     assert item["header_function"] == "DPRX_AUX_P_1"
+    assert item["excel_output_pin_type"] == ""
+
+
+def test_llm_review_payload_carries_output_pin_type():
+    """L2 送模型的条目里要带上 Excel H 列「Output PIN 设定类型」。"""
+    from types import SimpleNamespace
+
+    from genboardconfig.app.check_usecase import CheckUseCase
+
+    class _Capture:
+        def __init__(self):
+            self.items = []
+            self.stats = SimpleNamespace(messages=[])
+
+        def review_functions(self, items, progress=None):
+            self.items = list(items)
+            return {}
+
+        def review_failure(self, requirement_id):
+            return ""
+
+    engine = _engine()
+    req = _req("AUX1_CHP", "OUT", "Open-Drain Output", "SBU2_1(App) / SBU1_1")
+    results = engine.check([req])
+
+    orchestrator = _Capture()
+    usecase = CheckUseCase(
+        None, None, None, None, None,
+        orchestrator=orchestrator, profile=_profile(),
+    )
+    usecase._llm_function_review(results, [req], engine, lambda *a: None)
+
+    assert orchestrator.items[0]["excel_output_pin_type"] == "Open-Drain Output"
 
 
 def test_noise_net_is_skipped():

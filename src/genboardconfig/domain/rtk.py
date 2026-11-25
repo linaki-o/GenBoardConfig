@@ -38,9 +38,14 @@ def norm_text(text: str) -> str:
 
 
 def app_function(pin_name: str) -> str:
-    """取 Excel「PIN Name」列中带 (App) 标记的功能名（无则取第一项）。"""
+    """取 Excel「PIN Name」列中带 (App) 标记的功能名。
+
+    没有 (App) 标记时返回空串：C 列第一个功能只是「可选功能之一」，
+    并非原理图实际指定的复用功能，拿它当期望值会造成误判，
+    因此这种行不参与功能名（期望 vs 实际）判定。
+    """
     parts = [p.strip() for p in (pin_name or "").split("/") if p.strip()]
-    app = next((p for p in parts if "(App)" in p), parts[0] if parts else "")
+    app = next((p for p in parts if "(App)" in p), "")
     return norm_text(app.replace("(App)", ""))
 
 
@@ -404,7 +409,11 @@ class RtkEngine:
     def _check_function_name(
         self, req: GPIORequirement, entry: ConfigEntry, selected: str
     ) -> AttributeResult | None:
-        """L2：专用功能名与 Excel (App) 功能名不一致 → 交模型判定。"""
+        """L2：专用功能名与 Excel (App) 功能名不一致 → 交模型判定。
+
+        Excel 未标注 (App) 时不产生该属性：C 列第一项只是可选功能之一，
+        不能当作期望功能名。
+        """
         if not self.llm_equivalence:
             return None
         app = app_function(req.pin_name_raw)
@@ -451,6 +460,13 @@ class RtkEngine:
         """该行 Excel D 列「Description/ Function」，用于喂给模型。"""
         raw = (req.raw or {}).get(self.llm_description_field, "")
         return str(raw or "").strip()
+
+    def output_pin_type(self, req: GPIORequirement) -> str:
+        """该行 Excel H 列「Output PIN 设定类型」的类别（NA 等占位值按空处理）。"""
+        raw = self._attr_value(req, "io_type")
+        if not raw or self.profile.is_na(raw):
+            return ""
+        return raw.strip()
 
     # ------------------------------------------------------------------
     def _profile_value(self, req: GPIORequirement, field_name: str) -> str:

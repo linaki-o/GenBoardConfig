@@ -85,7 +85,8 @@ c_config:
     SCL: [SCL, IICSCL, DDCSCL, EEIICSCL, AUDIO_SCL, TXD_SCL, RXD_SCL]
     SDA: [SDA, IICSDA, DDCSDA, EEIICSDA, AUDIO_SDA, TXD_SDA, RXD_SDA]
     ADC: [ADC, ABIAS]
-    OUT: [PWM, GPO, DCLK, HPD, DET, LATCH, CTRL, SEL, EN, RESET, TEST4B]
+    # TCON 为面板时序控制输出（Excel G 列同样是 OUT）
+    OUT: [PWM, GPO, DCLK, HPD, DET, LATCH, CTRL, SEL, EN, RESET, TEST4B, TCON]
     IN: [GPI]
 
   # Excel 网络名噪声：命中即跳过该行（模板占位符 / 专用功能域）

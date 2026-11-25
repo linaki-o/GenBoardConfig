@@ -191,6 +191,8 @@ class CheckUseCase:
                     "excel_gpio_type": engine.gpio_category(req),
                     # Excel D 列「Description/ Function」：该引脚可复用的功能描述
                     "excel_description": engine.description_of(req),
+                    # Excel H 列「Output PIN 设定类型」：开漏/推挽输出类别
+                    "excel_output_pin_type": engine.output_pin_type(req),
                     "options": self._useful_options(entry.members),
                 }
             )
